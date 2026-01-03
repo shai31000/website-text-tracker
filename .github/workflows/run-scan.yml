@@ -30,21 +30,21 @@ jobs:
         run: node src/scan.js
 
       - name: Commit and push changes
-  run: |
-    git config user.name "github-actions"
-    git config user.email "github-actions@github.com"
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
 
-    echo "Git status before add:"
-    git status
+          echo "Git status before add:"
+          git status
 
-    git add data/snapshots.json data/titles.txt
+          git add data/snapshots.json data/titles.txt
 
-    echo "Git status after add:"
-    git status
+          echo "Git status after add:"
+          git status
 
-    git diff --cached || true
+          git diff --cached || true
 
-    git diff --cached --quiet || git commit -m "Update snapshots and titles"
+          git diff --cached --quiet || git commit -m "Update snapshots and titles"
 
-    git push
+          git push
 

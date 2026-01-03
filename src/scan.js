@@ -1,13 +1,14 @@
 /**
- * קובץ זה מוריד את האתר
- * וחולץ ממנו רק את כותרות הפוסטים
- * עם אפשרות לסינון מילים
+ * Scan.js - סריקה של כותרות הפוסטים באתר
+ * שימוש ב-Puppeteer כדי לטפל בדפים שמטענים תוכן דינמי
+ * שמירה של כותרות מסוננות גם לקובץ JSON וגם לקובץ טקסט
  */
 
 const fs = require("fs");
 const path = require("path");
+const puppeteer = require("puppeteer");
 
-// כתובת האתר שנסרוק
+// כתובת האתר לסריקה
 const TARGET_URL = "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
 // קובץ JSON לשמירת היסטוריית הסריקות
@@ -16,31 +17,34 @@ const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
 // קובץ טקסט עם רשימת הכותרות
 const OUTPUT_FILE = path.join(__dirname, "..", "data", "titles.txt");
 
-// מילים שברצונך לסנן מהכותרות
+// מילים שלא נרצה שיופיעו בכותרות
 const filterWords = ["להורדה"];
 
 async function run() {
   console.log("Starting scan...");
 
   try {
-    // הורדת HTML מהאתר
-    const response = await fetch(TARGET_URL);
+    // --- פתיחת דפדפן וטעינת הדף ---
+    const browser = await puppeteer.launch({ headless: true }); // headless = ללא חלון גרפי
+    const page = await browser.newPage();
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch website");
-    }
+    // טעינת הדף עם המתנה עד שכל המשאבים נטענים
+    await page.goto(TARGET_URL, { waitUntil: "networkidle0" });
 
-    const html = await response.text();
+    // --- חילוץ כותרות הפוסטים ---
+    // בוחר את כל הקישורים עם class="topictitle"
+    let titles = await page.$$eval("a.topictitle", links =>
+      links.map(a => a.textContent.trim())
+    );
 
-    // --- חילוץ כותרות הפוסטים בלבד ---
-    const matches = [...html.matchAll(/<a[^>]*class="topictitle"[^>]*>(.*?)<\/a>/gi)];
+    await browser.close();
 
-    let titles = matches.map(m => m[1].trim()); // לוקח רק את הטקסט שבתוך ה-a
+    console.log(`Found ${titles.length} titles before filtering.`);
 
     // --- פילטור מילים לא רצויות ---
     titles = titles.filter(title => !filterWords.some(word => title.includes(word)));
 
-    console.log("Found titles:", titles.length);
+    console.log(`Titles after filtering: ${titles.length}`);
 
     // --- שמירה לקובץ טקסט ---
     fs.writeFileSync(OUTPUT_FILE, titles.join("\n"), "utf-8");
@@ -59,6 +63,7 @@ async function run() {
       }
     }
 
+    // שמירת כותרות והזמן האחרון לסריקה
     snapshots[TARGET_URL] = {
       lastScan: new Date().toISOString(),
       titles
@@ -66,9 +71,11 @@ async function run() {
 
     fs.writeFileSync(DATA_FILE, JSON.stringify(snapshots, null, 2), "utf-8");
     console.log("Snapshot JSON updated.");
+
   } catch (error) {
     console.error("Scan failed:", error.message);
   }
 }
 
+// הפעלת הפונקציה
 run();

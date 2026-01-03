@@ -1,108 +1,92 @@
-// ייבוא ספריות
-const axios = require('axios');   // הורדת תוכן האתר
-const cheerio = require('cheerio'); // קריאת HTML
-const fs = require('fs');         // קריאה וכתיבה לקבצים
-const path = require('path');     // ניהול נתיבים
+* קובץ זה אחראי להורדת תוכן מאתר אינטרנט
+ * ולשמירת הטקסט שלו בקובץ snapshots.json
+ *
+ * הקוד כתוב בצורה פשוטה ומוסברת שורה־שורה
+ */
 
-// כתובת האתר לסריקה
-const TARGET_URL = 'http://www.mizrahit.co/viewforum.php?f=44';
+// מודול מובנה של Node.js לקריאת קבצים
+// משמש אותנו לקרוא ולכתוב קובץ JSON
+const fs = require("fs");
 
-// מיקום קובץ התוצאה
-const OUTPUT_FILE = path.join(__dirname, '../data/snapshots.json');
+// מודול מובנה שמאפשר עבודה עם נתיבים (paths)
+// עוזר לנו לבנות נתיב תקין לקובץ בכל מערכת
+const path = require("path");
 
-// פונקציית הסריקה הראשית
-async function scanForum() {
-  console.log('Starting scan...');
+// כתובת האתר שנסרוק
+// בשלב זה – אתר אחד בלבד
+const TARGET_URL = "https://example.com";
+
+// מיקום קובץ הנתונים
+const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
+
+/**
+ * פונקציה ראשית
+ * כל הקוד שלנו ירוץ מתוכה
+ */
+async function run() {
+  console.log("Starting scan...");
 
   try {
-    // שלב 1: הורדת HTML מהאתר
-    const response = await axios.get(TARGET_URL);
-    const html = response.data;
+    // הורדת תוכן האתר
+    const response = await fetch(TARGET_URL);
 
-    // שלב 2: טעינת HTML ל-cheerio
-    const $ = cheerio.load(html);
-
-    // כאן נשמור את הכותרות שנמצאו עכשיו
-    const newTitles = [];
-
-    
-// שלב 3.1: הגדרת מילים / ביטויים להסרה
-const blockedWords = [
-  'להורדה',
-  'HD',
-  'MV',
-  'קישור',
-  'חינם',
-  '⭐',
-  '🔥'
-  // אפשר להוסיף כאן מילים נוספות בעתיד
-];
-
-// שלב 3.2: סינון וניקוי מתקדם
-$('a.topictitle').each((i, el) => {
-  let title = $(el).text().trim();
-
-  // עבור כל מילה ברשימה – מחק אם קיימת
-  blockedWords.forEach(word => {
-    // מחיקה רגישה לאותיות – אפשר לשנות ל-case-insensitive
-    title = title.replace(word, '').trim();
-  });
-
-  // מחיקה של רווחים כפולים או סימנים מיותרים
-  title = title.replace(/\s+/g, ' ').trim();
-
-  if (title.length > 0) {
-    newTitles.push(title);
-  }
-});
-    // שלב 4: קריאת קובץ קודם אם קיים
-    let existingTitles = [];
-
-    if (fs.existsSync(OUTPUT_FILE)) {
-      // אם הקובץ קיים – נקרא אותו
-      const fileContent = fs.readFileSync(OUTPUT_FILE, 'utf8');
-
-      // הגנה מפני קובץ ריק או פגום
-      if (fileContent.trim().length > 0) {
-        const parsed = JSON.parse(fileContent);
-
-        if (Array.isArray(parsed.titles)) {
-          existingTitles = parsed.titles;
-        }
-      }
+    // בדיקה שהבקשה הצליחה
+    if (!response.ok) {
+      throw new Error("Failed to fetch website");
     }
 
-    // שלב 5: סינון כפילויות
-    // נוסיף רק כותרות שלא קיימות כבר
-    const uniqueNewTitles = newTitles.filter(
-      title => !existingTitles.includes(title)
-    );
+    // קבלת ה-HTML כטקסט
+    const html = await response.text();
 
-    // חיבור הרשימות
-    const finalTitles = existingTitles.concat(uniqueNewTitles);
+    // ניקוי גס של תגיות HTML
+    // המטרה: להשאיר טקסט קריא בלבד
+    const textOnly = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    // שלב 6: מבנה נתונים סופי
-    const outputData = {
-      source: TARGET_URL,
-      scannedAt: new Date().toISOString(),
-      totalTitles: finalTitles.length,
-      titles: finalTitles
-    };
+    // קריאת המידע הקיים מהקובץ
+    let snapshots = {};
 
-    // שלב 7: שמירה לקובץ
-    fs.writeFileSync(
-      OUTPUT_FILE,
-      JSON.stringify(outputData, null, 2),
-      'utf8'
-    );
+// אם הקובץ קיים – ננסה לקרוא אותו בזהירות
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
 
-    console.log('Scan completed and data saved.');
-    console.log(`Added ${uniqueNewTitles.length} new titles.`);
-
+    // אם הקובץ ריק – נתחיל מאובייקט ריק
+    if (fileContent === "") {
+      snapshots = {};
+    } else {
+      snapshots = JSON.parse(fileContent);
+    }
   } catch (err) {
-    console.error('Scan failed:', err.message);
+    // אם הקובץ פגום או לא קריא – לא נקרוס
+    console.log("Warning: snapshots.json was invalid, starting fresh");
+    snapshots = {};
   }
 }
 
-// הפעלת הסריקה
-scanForum();
+
+    // שמירת צילום המצב הנוכחי
+    snapshots[TARGET_URL] = {
+      lastScan: new Date().toISOString(),
+      text: textOnly
+    };
+
+    // כתיבה חזרה לקובץ
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(snapshots, null, 2),
+      "utf-8"
+    );
+
+    console.log("Scan completed and data saved.");
+  } catch (error) {
+    console.error("Scan failed:", error.message);
+  }
+}
+
+// הפעלת הפונקציה
+run();

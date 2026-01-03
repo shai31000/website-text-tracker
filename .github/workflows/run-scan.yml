@@ -3,7 +3,7 @@ name: Run website scan
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 * * * *" # פעם בשעה
 
 permissions:
   contents: write
@@ -13,38 +13,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # שלב 1: משיכת הקוד מהריפו
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # שלב 2: התקנת Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      # --- התקנת Puppeteer וה-dependencies שלו ---
+      # שלב 3: התקנת Puppeteer
       - name: Install dependencies
-        run: |
-          npm install puppeteer
+        run: npm install puppeteer
 
+      # שלב 4: הרצת הסקריפט
       - name: Run scan script
         run: node src/scan.js
 
+      # שלב 5: קומיט ודחיפה לגיטאב
       - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          echo "Git status before add:"
-          git status
-
           git add data/snapshots.json data/titles.txt
 
-          echo "Git status after add:"
-          git status
-
-          git diff --cached || true
-
-          git diff --cached --quiet || git commit -m "Update snapshots and titles"
+          # יצירת commit רק אם יש שינוי אמיתי
+          git diff --cached --quiet || git commit -m "Update forum titles"
 
           git push
-

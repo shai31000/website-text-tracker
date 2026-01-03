@@ -30,3 +30,20 @@ jobs:
       # שלב 3: הרצת קובץ הסריקה שלנו
       - name: Run scan script
         run: node src/scan.js
+
+              # שלב 4: שמירת שינויים חזרה ל-Repository
+      - name: Commit and push changes
+        run: |
+          # הגדרת משתמש זמני ל-GitHub
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # הוספת כל הקבצים ששונו
+          git add data/snapshots.json
+
+          # יצירת commit רק אם יש שינוי
+          git diff --cached --quiet || git commit -m "Update snapshots"
+
+          # שליחת השינויים ל-Repository
+          git push
+

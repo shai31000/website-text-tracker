@@ -9,6 +9,10 @@ on:
   # הרצה אוטומטית כל שעה
   schedule:
     - cron: "0 * * * *"
+  
+permissions:
+  contents: write
+
 
 # מה בדיוק GitHub צריך לעשות
 jobs:

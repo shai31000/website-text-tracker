@@ -1,50 +1,38 @@
-# שם הפעולה – זה מה שתראה בלשונית Actions
 name: Run website scan
 
-# מתי הפעולה תרוץ
 on:
-  # מאפשר לנו להפעיל ידנית (כפתור Run)
   workflow_dispatch:
-
-  # הרצה אוטומטית כל שעה
   schedule:
     - cron: "0 * * * *"
+
 permissions:
   contents: write
-  
-# מה בדיוק GitHub צריך לעשות
+
 jobs:
   scan:
-    # סוג המחשב הווירטואלי
     runs-on: ubuntu-latest
 
     steps:
-      # שלב 1: הורדת הקוד שלנו למחשב של GitHub
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # שלב 2: התקנת Node.js (כדי להריץ JavaScript)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      # שלב 3: הרצת קובץ הסריקה שלנו
+      # --- התקנת Puppeteer וה-dependencies שלו ---
+      - name: Install dependencies
+        run: |
+          npm install puppeteer
+
       - name: Run scan script
         run: node src/scan.js
 
- # שלב 4: שמירת שינויים חזרה ל-Repository
       - name: Commit and push changes
         run: |
-          # הגדרת משתמש זמני ל-GitHub
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-
-          # הוספת כל הקבצים ששונו
-          git add data/snapshots.json
-
-          # יצירת commit רק אם יש שינוי
-          git diff --cached --quiet || git commit -m "Update snapshots"
-
-          # שליחת השינויים ל-Repository
+          git add data/snapshots.json data/titles.txt
+          git diff --cached --quiet || git commit -m "Update snapshots and titles"
           git push

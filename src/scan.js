@@ -1,4 +1,5 @@
-* קובץ זה אחראי להורדת תוכן מאתר אינטרנט
+/**
+ * קובץ זה אחראי להורדת תוכן מאתר אינטרנט
  * ולשמירת הטקסט שלו בקובץ snapshots.json
  *
  * הקוד כתוב בצורה פשוטה ומוסברת שורה־שורה
@@ -49,25 +50,9 @@ async function run() {
 
     // קריאת המידע הקיים מהקובץ
     let snapshots = {};
-
-// אם הקובץ קיים – ננסה לקרוא אותו בזהירות
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
-
-    // אם הקובץ ריק – נתחיל מאובייקט ריק
-    if (fileContent === "") {
-      snapshots = {};
-    } else {
-      snapshots = JSON.parse(fileContent);
+    if (fs.existsSync(DATA_FILE)) {
+      snapshots = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
     }
-  } catch (err) {
-    // אם הקובץ פגום או לא קריא – לא נקרוס
-    console.log("Warning: snapshots.json was invalid, starting fresh");
-    snapshots = {};
-  }
-}
-
 
     // שמירת צילום המצב הנוכחי
     snapshots[TARGET_URL] = {

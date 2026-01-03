@@ -1,88 +1,95 @@
 /**
- * Scan.js - סריקה של כותרות הפוסטים באתר
- * שימוש ב-Puppeteer כדי לטפל בדפים שמטענים תוכן דינמי
- * שמירה של כותרות מסוננות גם לקובץ JSON וגם לקובץ טקסט
+ * scan.js
+ *
+ * סקריפט זה:
+ * 1. טוען את דף הפורום באמצעות Puppeteer (דפדפן אמיתי)
+ * 2. מחלץ רק את כותרות הפוסטים (a.topictitle)
+ * 3. מסנן מילים לא רצויות (למשל "להורדה")
+ * 4. שומר את הכותרות לקובץ טקסט
+ * 5. מעדכן קובץ JSON עם היסטוריית הסריקה
  */
 
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 
-// כתובת האתר לסריקה
-const TARGET_URL = "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
+// כתובת הדף שנסרק
+const TARGET_URL =
+  "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
-// קובץ JSON לשמירת היסטוריית הסריקות
+// נתיבים לקבצים
 const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
-
-// קובץ טקסט עם רשימת הכותרות
 const OUTPUT_FILE = path.join(__dirname, "..", "data", "titles.txt");
 
-// מילים שלא נרצה שיופיעו בכותרות
-const filterWords = ["להורדה"];
+// מילים שייסוננו מהכותרות
+const FILTER_WORDS = ["להורדה"];
 
 async function run() {
   console.log("Starting scan...");
 
+  // חשוב: הגדרה מראש כדי שלא תהיה שגיאת ReferenceError
+  let titles = [];
+
   try {
-    // --- פתיחת דפדפן וטעינת הדף ---
-    const browser = await puppeteer.launch({ headless: true }); // headless = ללא חלון גרפי
+    // פתיחת דפדפן headless (מותאם ל-GitHub Actions)
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
     const page = await browser.newPage();
 
-    // טעינת הדף עם המתנה עד שכל המשאבים נטענים
+    // טעינת הדף והמתנה לטעינה מלאה
     await page.goto(TARGET_URL, { waitUntil: "networkidle0" });
 
-    // --- חילוץ כותרות הפוסטים ---
-    // בוחר את כל הקישורים עם class="topictitle"
-    let titles = await page.$$eval("a.topictitle", links =>
-      links.map(a => a.textContent.trim())
+    // המתנה מפורשת לכך שכותרות יופיעו בדף
+    await page.waitForSelector("a.topictitle", { timeout: 15000 });
+
+    // חילוץ הטקסט של כל כותרות הפוסטים
+    titles = await page.$$eval("a.topictitle", (links) =>
+      links.map((a) => a.textContent.trim())
     );
 
     await browser.close();
 
-    console.log(`Found ${titles.length} titles before filtering.`);
+    console.log("Titles found:", titles.length);
 
-    // --- פילטור מילים לא רצויות ---
-    titles = titles.filter(title => !filterWords.some(word => title.includes(word)));
+    // פילטור מילים לא רצויות
+    titles = titles.filter(
+      (title) => !FILTER_WORDS.some((word) => title.includes(word))
+    );
 
-    console.log(`Titles after filtering: ${titles.length}`);
+    console.log("Titles after filtering:", titles.length);
 
-    // --- שמירה לקובץ טקסט ---
+    // שמירה לקובץ טקסט (מחליף את התוכן בכל ריצה)
     fs.writeFileSync(OUTPUT_FILE, titles.join("\n"), "utf-8");
-    console.log(`Filtered titles saved to ${OUTPUT_FILE}`);
+    console.log("titles.txt written successfully");
 
-    // --- שמירת היסטוריה ב-snapshots.json ---
+    // --- עדכון snapshots.json ---
     let snapshots = {};
 
     if (fs.existsSync(DATA_FILE)) {
       try {
-        const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
-        snapshots = fileContent ? JSON.parse(fileContent) : {};
+        const content = fs.readFileSync(DATA_FILE, "utf-8").trim();
+        snapshots = content ? JSON.parse(content) : {};
       } catch {
-        console.log("Warning: snapshots.json was invalid, starting fresh");
+        console.log("snapshots.json was invalid, starting fresh");
         snapshots = {};
       }
     }
 
-    // שמירת כותרות והזמן האחרון לסריקה
     snapshots[TARGET_URL] = {
       lastScan: new Date().toISOString(),
-      titles
+      titles,
     };
 
     fs.writeFileSync(DATA_FILE, JSON.stringify(snapshots, null, 2), "utf-8");
-    console.log("Snapshot JSON updated.");
-
-  } catch (error) {
-    console.error("Scan failed:", error.message);
+    console.log("snapshots.json updated");
+  } catch (err) {
+    console.error("Scan failed:", err.message);
+    process.exit(1); // חשוב כדי ש-GitHub Actions ידע שהריצה נכשלה
   }
 }
 
-console.log("Titles file path:", OUTPUT_FILE);
-console.log("Titles count:", titles.length);
-
-fs.writeFileSync(OUTPUT_FILE, titles.join("\n"), "utf-8");
-console.log("titles.txt written successfully");
-
-
-// הפעלת הפונקציה
+// הפעלת הסקריפט
 run();

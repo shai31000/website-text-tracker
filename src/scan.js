@@ -1,48 +1,55 @@
 /**
- * סריקת פורום וחילוץ כותרות פוסטים בלבד
- * כולל ניקוי מילים "שחורות" מתוך הכותרות
+ * סריקת פורום וחילוץ כותרות פוסטים
+ * ניקוי מילים שחורות מקובץ חיצוני
  */
 
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 
-// כתובת הסריקה
+// כתובת הפורום
 const TARGET_URL =
   "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
-// קובץ יעד לכותרות
+// קבצים
 const TITLES_FILE = path.join(__dirname, "..", "data", "titles.txt");
+const BLACKLIST_FILE = path.join(__dirname, "..", "data", "blacklist.txt");
 
 /**
- * רשימת מילים אסורות
- * כל מילה כאן תוסר מהכותרת (ולא תפסול את כל הכותרת)
+ * קריאת מילים שחורות מקובץ
  */
-const BLACKLIST_WORDS = [
-  "להורדה",
-  "הורדה",
-  "DOWNLOAD"
-];
+function loadBlacklist() {
+  if (!fs.existsSync(BLACKLIST_FILE)) {
+    console.log("Blacklist file not found, continuing without filtering");
+    return [];
+  }
+
+  return fs
+    .readFileSync(BLACKLIST_FILE, "utf-8")
+    .split("\n")
+    .map(w => w.trim())
+    .filter(Boolean);
+}
 
 /**
- * פונקציה שמנקה כותרת ממילים אסורות
+ * ניקוי כותרת ממילים שחורות
  */
-function cleanTitle(title) {
+function cleanTitle(title, blacklist) {
   let cleaned = title;
 
-  for (const word of BLACKLIST_WORDS) {
-    // הסרה גם אם המילה באמצע המשפט
+  for (const word of blacklist) {
     const regex = new RegExp(`\\b${word}\\b`, "gi");
     cleaned = cleaned.replace(regex, "");
   }
 
-  // ניקוי רווחים כפולים
   return cleaned.replace(/\s+/g, " ").trim();
 }
 
 async function run() {
   console.log("Starting scan...");
-  console.log("Titles file path:", TITLES_FILE);
+
+  const blacklist = loadBlacklist();
+  console.log("Blacklist words loaded:", blacklist.length);
 
   const browser = await puppeteer.launch({
     headless: "new",
@@ -57,22 +64,19 @@ async function run() {
       timeout: 60000
     });
 
-    /**
-     * חילוץ הכותרות מה־DOM
-     * לפי class="topictitle"
-     */
-    const rawTitles = await page.$$eval("a.topictitle", elements =>
-      elements.map(el => el.textContent.trim())
+    // חילוץ כותרות מה-DOM
+    const rawTitles = await page.$$eval("a.topictitle", els =>
+      els.map(el => el.textContent.trim())
     );
 
-    // ניקוי כותרות ממילים אסורות
+    // ניקוי מילים שחורות
     const cleanedTitles = rawTitles
-      .map(cleanTitle)
+      .map(title => cleanTitle(title, blacklist))
       .filter(title => title.length > 0);
 
     console.log("Titles found:", cleanedTitles.length);
 
-    // קריאה של הקובץ הקיים (אם יש)
+    // קריאה של כותרות קיימות
     let existingTitles = [];
     if (fs.existsSync(TITLES_FILE)) {
       existingTitles = fs

@@ -1,92 +1,74 @@
 /**
- * קובץ זה אחראי להורדת תוכן מאתר אינטרנט
- * ולשמירת הטקסט שלו בקובץ snapshots.json
- *
- * הקוד כתוב בצורה פשוטה ומוסברת שורה־שורה
+ * קובץ זה מוריד את האתר
+ * וחולץ ממנו רק את כותרות הפוסטים
+ * עם אפשרות לסינון מילים
  */
 
-// מודול מובנה של Node.js לקריאת קבצים
-// משמש אותנו לקרוא ולכתוב קובץ JSON
 const fs = require("fs");
-
-// מודול מובנה שמאפשר עבודה עם נתיבים (paths)
-// עוזר לנו לבנות נתיב תקין לקובץ בכל מערכת
 const path = require("path");
 
 // כתובת האתר שנסרוק
-// בשלב זה – אתר אחד בלבד
 const TARGET_URL = "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
-// מיקום קובץ הנתונים
+// קובץ JSON לשמירת היסטוריית הסריקות
 const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
 
-/**
- * פונקציה ראשית
- * כל הקוד שלנו ירוץ מתוכה
- */
+// קובץ טקסט עם רשימת הכותרות
+const OUTPUT_FILE = path.join(__dirname, "..", "data", "titles.txt");
+
+// מילים שברצונך לסנן מהכותרות
+const filterWords = ["להורדה"];
+
 async function run() {
   console.log("Starting scan...");
 
   try {
-    // הורדת תוכן האתר
+    // הורדת HTML מהאתר
     const response = await fetch(TARGET_URL);
 
-    // בדיקה שהבקשה הצליחה
     if (!response.ok) {
       throw new Error("Failed to fetch website");
     }
 
-    // קבלת ה-HTML כטקסט
     const html = await response.text();
 
-    // ניקוי גס של תגיות HTML
-    // המטרה: להשאיר טקסט קריא בלבד
-    const textOnly = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    // --- חילוץ כותרות הפוסטים בלבד ---
+    const matches = [...html.matchAll(/<a[^>]*class="topictitle"[^>]*>(.*?)<\/a>/gi)];
 
-    // קריאת המידע הקיים מהקובץ
+    let titles = matches.map(m => m[1].trim()); // לוקח רק את הטקסט שבתוך ה-a
+
+    // --- פילטור מילים לא רצויות ---
+    titles = titles.filter(title => !filterWords.some(word => title.includes(word)));
+
+    console.log("Found titles:", titles.length);
+
+    // --- שמירה לקובץ טקסט ---
+    fs.writeFileSync(OUTPUT_FILE, titles.join("\n"), "utf-8");
+    console.log(`Filtered titles saved to ${OUTPUT_FILE}`);
+
+    // --- שמירת היסטוריה ב-snapshots.json ---
     let snapshots = {};
 
-// אם הקובץ קיים – ננסה לקרוא אותו בזהירות
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
-
-    // אם הקובץ ריק – נתחיל מאובייקט ריק
-    if (fileContent === "") {
-      snapshots = {};
-    } else {
-      snapshots = JSON.parse(fileContent);
+    if (fs.existsSync(DATA_FILE)) {
+      try {
+        const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
+        snapshots = fileContent ? JSON.parse(fileContent) : {};
+      } catch {
+        console.log("Warning: snapshots.json was invalid, starting fresh");
+        snapshots = {};
+      }
     }
-  } catch (err) {
-    // אם הקובץ פגום או לא קריא – לא נקרוס
-    console.log("Warning: snapshots.json was invalid, starting fresh");
-    snapshots = {};
-  }
-}
 
-    // שמירת צילום המצב הנוכחי
     snapshots[TARGET_URL] = {
       lastScan: new Date().toISOString(),
-      text: textOnly
+      titles
     };
 
-    // כתיבה חזרה לקובץ
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(snapshots, null, 2),
-      "utf-8"
-    );
-
-    console.log("Scan completed and data saved.");
+    fs.writeFileSync(DATA_FILE, JSON.stringify(snapshots, null, 2), "utf-8");
+    console.log("Snapshot JSON updated.");
   } catch (error) {
     console.error("Scan failed:", error.message);
   }
 }
 
-// הפעלת הפונקציה
 run();

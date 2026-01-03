@@ -9,10 +9,9 @@ on:
   # הרצה אוטומטית כל שעה
   schedule:
     - cron: "0 * * * *"
-  
+
 permissions:
   contents: write
-
 
 # מה בדיוק GitHub צריך לעשות
 jobs:
@@ -35,7 +34,7 @@ jobs:
       - name: Run scan script
         run: node src/scan.js
 
-              # שלב 4: שמירת שינויים חזרה ל-Repository
+      # שלב 4: שמירת שינויים חזרה ל-Repository
       - name: Commit and push changes
         run: |
           # הגדרת משתמש זמני ל-GitHub
@@ -50,4 +49,3 @@ jobs:
 
           # שליחת השינויים ל-Repository
           git push
-

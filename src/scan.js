@@ -1,92 +1,90 @@
-/**
- * קובץ זה אחראי להורדת תוכן מאתר אינטרנט
- * ולשמירת הטקסט שלו בקובץ snapshots.json
- *
- * הקוד כתוב בצורה פשוטה ומוסברת שורה־שורה
- */
+// ייבוא ספריות
+const axios = require('axios');   // הורדת תוכן האתר
+const cheerio = require('cheerio'); // קריאת HTML
+const fs = require('fs');         // קריאה וכתיבה לקבצים
+const path = require('path');     // ניהול נתיבים
 
-// מודול מובנה של Node.js לקריאת קבצים
-// משמש אותנו לקרוא ולכתוב קובץ JSON
-const fs = require("fs");
+// כתובת האתר לסריקה
+const TARGET_URL = 'http://www.mizrahit.co/viewforum.php?f=44';
 
-// מודול מובנה שמאפשר עבודה עם נתיבים (paths)
-// עוזר לנו לבנות נתיב תקין לקובץ בכל מערכת
-const path = require("path");
+// מיקום קובץ התוצאה
+const OUTPUT_FILE = path.join(__dirname, '../data/snapshots.json');
 
-// כתובת האתר שנסרוק
-// בשלב זה – אתר אחד בלבד
-const TARGET_URL = "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
-
-// מיקום קובץ הנתונים
-const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
-
-/**
- * פונקציה ראשית
- * כל הקוד שלנו ירוץ מתוכה
- */
-async function run() {
-  console.log("Starting scan...");
+// פונקציית הסריקה הראשית
+async function scanForum() {
+  console.log('Starting scan...');
 
   try {
-    // הורדת תוכן האתר
-    const response = await fetch(TARGET_URL);
+    // שלב 1: הורדת HTML מהאתר
+    const response = await axios.get(TARGET_URL);
+    const html = response.data;
 
-    // בדיקה שהבקשה הצליחה
-    if (!response.ok) {
-      throw new Error("Failed to fetch website");
+    // שלב 2: טעינת HTML ל-cheerio
+    const $ = cheerio.load(html);
+
+    // כאן נשמור את הכותרות שנמצאו עכשיו
+    const newTitles = [];
+
+    // שלב 3: שליפת כותרות הפוסטים
+    $('a.topictitle').each((i, el) => {
+      let title = $(el).text().trim();
+
+      // ניקוי מילים לא רצויות
+      title = title.replace('להורדה', '').trim();
+
+      if (title.length > 0) {
+        newTitles.push(title);
+      }
+    });
+
+    // שלב 4: קריאת קובץ קודם אם קיים
+    let existingTitles = [];
+
+    if (fs.existsSync(OUTPUT_FILE)) {
+      // אם הקובץ קיים – נקרא אותו
+      const fileContent = fs.readFileSync(OUTPUT_FILE, 'utf8');
+
+      // הגנה מפני קובץ ריק או פגום
+      if (fileContent.trim().length > 0) {
+        const parsed = JSON.parse(fileContent);
+
+        if (Array.isArray(parsed.titles)) {
+          existingTitles = parsed.titles;
+        }
+      }
     }
 
-    // קבלת ה-HTML כטקסט
-    const html = await response.text();
-
-    // ניקוי גס של תגיות HTML
-    // המטרה: להשאיר טקסט קריא בלבד
-    const textOnly = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    // קריאת המידע הקיים מהקובץ
-    let snapshots = {};
-
-// אם הקובץ קיים – ננסה לקרוא אותו בזהירות
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
-
-    // אם הקובץ ריק – נתחיל מאובייקט ריק
-    if (fileContent === "") {
-      snapshots = {};
-    } else {
-      snapshots = JSON.parse(fileContent);
-    }
-  } catch (err) {
-    // אם הקובץ פגום או לא קריא – לא נקרוס
-    console.log("Warning: snapshots.json was invalid, starting fresh");
-    snapshots = {};
-  }
-}
-
-    // שמירת צילום המצב הנוכחי
-    snapshots[TARGET_URL] = {
-      lastScan: new Date().toISOString(),
-      text: textOnly
-    };
-
-    // כתיבה חזרה לקובץ
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(snapshots, null, 2),
-      "utf-8"
+    // שלב 5: סינון כפילויות
+    // נוסיף רק כותרות שלא קיימות כבר
+    const uniqueNewTitles = newTitles.filter(
+      title => !existingTitles.includes(title)
     );
 
-    console.log("Scan completed and data saved.");
-  } catch (error) {
-    console.error("Scan failed:", error.message);
+    // חיבור הרשימות
+    const finalTitles = existingTitles.concat(uniqueNewTitles);
+
+    // שלב 6: מבנה נתונים סופי
+    const outputData = {
+      source: TARGET_URL,
+      scannedAt: new Date().toISOString(),
+      totalTitles: finalTitles.length,
+      titles: finalTitles
+    };
+
+    // שלב 7: שמירה לקובץ
+    fs.writeFileSync(
+      OUTPUT_FILE,
+      JSON.stringify(outputData, null, 2),
+      'utf8'
+    );
+
+    console.log('Scan completed and data saved.');
+    console.log(`Added ${uniqueNewTitles.length} new titles.`);
+
+  } catch (err) {
+    console.error('Scan failed:', err.message);
   }
 }
 
-// הפעלת הפונקציה
-run();
+// הפעלת הסריקה
+scanForum();

@@ -77,5 +77,12 @@ async function run() {
   }
 }
 
+console.log("Titles file path:", OUTPUT_FILE);
+console.log("Titles count:", titles.length);
+
+fs.writeFileSync(OUTPUT_FILE, titles.join("\n"), "utf-8");
+console.log("titles.txt written successfully");
+
+
 // הפעלת הפונקציה
 run();

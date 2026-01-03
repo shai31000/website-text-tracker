@@ -25,18 +25,36 @@ async function scanForum() {
     // כאן נשמור את הכותרות שנמצאו עכשיו
     const newTitles = [];
 
-    // שלב 3: שליפת כותרות הפוסטים
-    $('a.topictitle').each((i, el) => {
-      let title = $(el).text().trim();
+    
+// שלב 3.1: הגדרת מילים / ביטויים להסרה
+const blockedWords = [
+  'להורדה',
+  'HD',
+  'MV',
+  'קישור',
+  'חינם',
+  '⭐',
+  '🔥'
+  // אפשר להוסיף כאן מילים נוספות בעתיד
+];
 
-      // ניקוי מילים לא רצויות
-      title = title.replace('להורדה', '').trim();
+// שלב 3.2: סינון וניקוי מתקדם
+$('a.topictitle').each((i, el) => {
+  let title = $(el).text().trim();
 
-      if (title.length > 0) {
-        newTitles.push(title);
-      }
-    });
+  // עבור כל מילה ברשימה – מחק אם קיימת
+  blockedWords.forEach(word => {
+    // מחיקה רגישה לאותיות – אפשר לשנות ל-case-insensitive
+    title = title.replace(word, '').trim();
+  });
 
+  // מחיקה של רווחים כפולים או סימנים מיותרים
+  title = title.replace(/\s+/g, ' ').trim();
+
+  if (title.length > 0) {
+    newTitles.push(title);
+  }
+});
     // שלב 4: קריאת קובץ קודם אם קיים
     let existingTitles = [];
 

@@ -32,18 +32,41 @@ async function run() {
 
   try {
     // פתיחת דפדפן headless (מותאם ל-GitHub Actions)
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    // פתיחת דפדפן מותאם ל-GitHub Actions ולחסימות
+const browser = await puppeteer.launch({
+  headless: true,
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-web-security",
+    "--disable-features=IsolateOrigins,site-per-process",
+  ],
+});
 
-    const page = await browser.newPage();
+const page = await browser.newPage();
 
-    // טעינת הדף והמתנה לטעינה מלאה
-    await page.goto(TARGET_URL, { waitUntil: "networkidle0" });
+// התחזות לדפדפן Chrome רגיל
+await page.setUserAgent(
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/120.0.0.0 Safari/537.36"
+);
 
-    // המתנה מפורשת לכך שכותרות יופיעו בדף
-    await page.waitForSelector("a.topictitle", { timeout: 15000 });
+// לא לחסום שום בקשת רשת
+await page.setRequestInterception(true);
+page.on("request", (req) => {
+  req.continue();
+});
+
+// טעינת הדף – בלי networkidle (חשוב!)
+await page.goto(TARGET_URL, {
+  waitUntil: "domcontentloaded",
+  timeout: 60000,
+});
+
+// עכשיו מחכים שהכותרות יופיעו
+await page.waitForSelector("a.topictitle", { timeout: 20000 });
+
 
     // חילוץ הטקסט של כל כותרות הפוסטים
     titles = await page.$$eval("a.topictitle", (links) =>

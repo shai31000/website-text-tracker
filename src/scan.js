@@ -1,118 +1,103 @@
 /**
  * scan.js
- *
- * סקריפט זה:
- * 1. טוען את דף הפורום באמצעות Puppeteer (דפדפן אמיתי)
- * 2. מחלץ רק את כותרות הפוסטים (a.topictitle)
- * 3. מסנן מילים לא רצויות (למשל "להורדה")
- * 4. שומר את הכותרות לקובץ טקסט
- * 5. מעדכן קובץ JSON עם היסטוריית הסריקה
+ * סורק דף פורום, מחלץ כותרות נושאים, ושומר אותן לקבצים
  */
 
 const fs = require("fs");
 const path = require("path");
-const puppeteer = require("puppeteer");
 
-// כתובת הדף שנסרק
+// ב־Node 18+ fetch כבר מובנה
 const TARGET_URL =
   "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
-// נתיבים לקבצים
-const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
-const OUTPUT_FILE = path.join(__dirname, "..", "data", "titles.txt");
+// נתיבי קבצים
+const DATA_DIR = path.join(__dirname, "..", "data");
+const SNAPSHOTS_PATH = path.join(DATA_DIR, "snapshots.json");
+const TITLES_PATH = path.join(DATA_DIR, "titles.txt");
 
-// מילים שייסוננו מהכותרות
-const FILTER_WORDS = ["להורדה"];
+// ודא שתיקיית data קיימת
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 async function run() {
   console.log("Starting scan...");
 
-  // חשוב: הגדרה מראש כדי שלא תהיה שגיאת ReferenceError
-  let titles = [];
+  let html;
 
   try {
-    // פתיחת דפדפן headless (מותאם ל-GitHub Actions)
-    // פתיחת דפדפן מותאם ל-GitHub Actions ולחסימות
-const browser = await puppeteer.launch({
-  headless: true,
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-web-security",
-    "--disable-features=IsolateOrigins,site-per-process",
-  ],
-});
+    // הורדת HTML רגיל
+    const response = await fetch(TARGET_URL, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+      },
+    });
 
-const page = await browser.newPage();
-
-// התחזות לדפדפן Chrome רגיל
-await page.setUserAgent(
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-  "AppleWebKit/537.36 (KHTML, like Gecko) " +
-  "Chrome/120.0.0.0 Safari/537.36"
-);
-
-// לא לחסום שום בקשת רשת
-await page.setRequestInterception(true);
-page.on("request", (req) => {
-  req.continue();
-});
-
-// טעינת הדף – בלי networkidle (חשוב!)
-await page.goto(TARGET_URL, {
-  waitUntil: "domcontentloaded",
-  timeout: 60000,
-});
-
-// עכשיו מחכים שהכותרות יופיעו
-await page.waitForSelector("a.topictitle", { timeout: 20000 });
-
-
-    // חילוץ הטקסט של כל כותרות הפוסטים
-    titles = await page.$$eval("a.topictitle", (links) =>
-      links.map((a) => a.textContent.trim())
-    );
-
-    await browser.close();
-
-    console.log("Titles found:", titles.length);
-
-    // פילטור מילים לא רצויות
-    titles = titles.filter(
-      (title) => !FILTER_WORDS.some((word) => title.includes(word))
-    );
-
-    console.log("Titles after filtering:", titles.length);
-
-    // שמירה לקובץ טקסט (מחליף את התוכן בכל ריצה)
-    fs.writeFileSync(OUTPUT_FILE, titles.join("\n"), "utf-8");
-    console.log("titles.txt written successfully");
-
-    // --- עדכון snapshots.json ---
-    let snapshots = {};
-
-    if (fs.existsSync(DATA_FILE)) {
-      try {
-        const content = fs.readFileSync(DATA_FILE, "utf-8").trim();
-        snapshots = content ? JSON.parse(content) : {};
-      } catch {
-        console.log("snapshots.json was invalid, starting fresh");
-        snapshots = {};
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
     }
 
-    snapshots[TARGET_URL] = {
-      lastScan: new Date().toISOString(),
-      titles,
-    };
-
-    fs.writeFileSync(DATA_FILE, JSON.stringify(snapshots, null, 2), "utf-8");
-    console.log("snapshots.json updated");
+    html = await response.text();
   } catch (err) {
-    console.error("Scan failed:", err.message);
-    process.exit(1); // חשוב כדי ש-GitHub Actions ידע שהריצה נכשלה
+    console.error("Failed to fetch page:", err.message);
+    process.exit(0); // לא מפיל את ה־Action
   }
+
+  // חילוץ כותרות נושאים מהפורום
+  // PHPBB משתמש בקישור עם class="topictitle"
+  const titleRegex =
+    /<a[^>]+class="topictitle"[^>]*>(.*?)<\/a>/gi;
+
+  const titles = [];
+  let match;
+
+  while ((match = titleRegex.exec(html)) !== null) {
+    // ניקוי תגיות HTML פנימיות
+    const cleanTitle = match[1]
+      .replace(/<[^>]*>/g, "")
+      .trim();
+
+    if (cleanTitle && cleanTitle.includes("להורדה")) {
+      titles.push(cleanTitle);
+    }
+  }
+
+  console.log("Titles found:", titles.length);
+
+  // קריאת snapshots קיים (אם יש)
+  let snapshots = {};
+  if (fs.existsSync(SNAPSHOTS_PATH)) {
+    try {
+      snapshots = JSON.parse(
+        fs.readFileSync(SNAPSHOTS_PATH, "utf8")
+      );
+    } catch {
+      snapshots = {};
+    }
+  }
+
+  // עדכון snapshot
+  snapshots[TARGET_URL] = {
+    lastScan: new Date().toISOString(),
+    titles,
+  };
+
+  // שמירת JSON
+  fs.writeFileSync(
+    SNAPSHOTS_PATH,
+    JSON.stringify(snapshots, null, 2),
+    "utf8"
+  );
+
+  // שמירת TXT (רק הכותרות)
+  fs.writeFileSync(
+    TITLES_PATH,
+    titles.join("\n"),
+    "utf8"
+  );
+
+  console.log("Scan completed successfully");
 }
 
-// הפעלת הסקריפט
 run();

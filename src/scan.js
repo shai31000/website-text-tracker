@@ -15,7 +15,7 @@ const path = require("path");
 
 // כתובת האתר שנסרוק
 // בשלב זה – אתר אחד בלבד
-const TARGET_URL = "https://example.com";
+const TARGET_URL = "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
 // מיקום קובץ הנתונים
 const DATA_FILE = path.join(__dirname, "..", "data", "snapshots.json");
@@ -50,9 +50,24 @@ async function run() {
 
     // קריאת המידע הקיים מהקובץ
     let snapshots = {};
-    if (fs.existsSync(DATA_FILE)) {
-      snapshots = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+
+// אם הקובץ קיים – ננסה לקרוא אותו בזהירות
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    const fileContent = fs.readFileSync(DATA_FILE, "utf-8").trim();
+
+    // אם הקובץ ריק – נתחיל מאובייקט ריק
+    if (fileContent === "") {
+      snapshots = {};
+    } else {
+      snapshots = JSON.parse(fileContent);
     }
+  } catch (err) {
+    // אם הקובץ פגום או לא קריא – לא נקרוס
+    console.log("Warning: snapshots.json was invalid, starting fresh");
+    snapshots = {};
+  }
+}
 
     // שמירת צילום המצב הנוכחי
     snapshots[TARGET_URL] = {

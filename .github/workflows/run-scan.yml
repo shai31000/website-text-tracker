@@ -16,13 +16,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+            - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Run scan
+      # 🔽 שלב חדש – התקנת חבילות
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run scan script
         run: node src/scan.js
+
 
       - name: Commit and push changes
         run: |

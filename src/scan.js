@@ -1,103 +1,107 @@
 /**
- * scan.js
- * סורק דף פורום, מחלץ כותרות נושאים, ושומר אותן לקבצים
+ * סריקת פורום וחילוץ כותרות פוסטים בלבד
+ * כולל ניקוי מילים "שחורות" מתוך הכותרות
  */
 
 const fs = require("fs");
 const path = require("path");
+const puppeteer = require("puppeteer");
 
-// ב־Node 18+ fetch כבר מובנה
+// כתובת הסריקה
 const TARGET_URL =
   "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
-// נתיבי קבצים
-const DATA_DIR = path.join(__dirname, "..", "data");
-const SNAPSHOTS_PATH = path.join(DATA_DIR, "snapshots.json");
-const TITLES_PATH = path.join(DATA_DIR, "titles.txt");
+// קובץ יעד לכותרות
+const TITLES_FILE = path.join(__dirname, "..", "data", "titles.txt");
 
-// ודא שתיקיית data קיימת
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+/**
+ * רשימת מילים אסורות
+ * כל מילה כאן תוסר מהכותרת (ולא תפסול את כל הכותרת)
+ */
+const BLACKLIST_WORDS = [
+  "להורדה",
+  "הורדה",
+  "DOWNLOAD"
+];
+
+/**
+ * פונקציה שמנקה כותרת ממילים אסורות
+ */
+function cleanTitle(title) {
+  let cleaned = title;
+
+  for (const word of BLACKLIST_WORDS) {
+    // הסרה גם אם המילה באמצע המשפט
+    const regex = new RegExp(`\\b${word}\\b`, "gi");
+    cleaned = cleaned.replace(regex, "");
+  }
+
+  // ניקוי רווחים כפולים
+  return cleaned.replace(/\s+/g, " ").trim();
 }
 
 async function run() {
   console.log("Starting scan...");
+  console.log("Titles file path:", TITLES_FILE);
 
-  let html;
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+
+  const page = await browser.newPage();
 
   try {
-    // הורדת HTML רגיל
-    const response = await fetch(TARGET_URL, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-      },
+    await page.goto(TARGET_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}`);
+    /**
+     * חילוץ הכותרות מה־DOM
+     * לפי class="topictitle"
+     */
+    const rawTitles = await page.$$eval("a.topictitle", elements =>
+      elements.map(el => el.textContent.trim())
+    );
+
+    // ניקוי כותרות ממילים אסורות
+    const cleanedTitles = rawTitles
+      .map(cleanTitle)
+      .filter(title => title.length > 0);
+
+    console.log("Titles found:", cleanedTitles.length);
+
+    // קריאה של הקובץ הקיים (אם יש)
+    let existingTitles = [];
+    if (fs.existsSync(TITLES_FILE)) {
+      existingTitles = fs
+        .readFileSync(TITLES_FILE, "utf-8")
+        .split("\n")
+        .map(t => t.trim())
+        .filter(Boolean);
     }
 
-    html = await response.text();
-  } catch (err) {
-    console.error("Failed to fetch page:", err.message);
-    process.exit(0); // לא מפיל את ה־Action
-  }
+    // מניעת כפילויות
+    const newTitles = cleanedTitles.filter(
+      title => !existingTitles.includes(title)
+    );
 
-  // חילוץ כותרות נושאים מהפורום
-  // PHPBB משתמש בקישור עם class="topictitle"
-  const titleRegex =
-    /<a[^>]+class="topictitle"[^>]*>(.*?)<\/a>/gi;
-
-  const titles = [];
-  let match;
-
-  while ((match = titleRegex.exec(html)) !== null) {
-    // ניקוי תגיות HTML פנימיות
-    const cleanTitle = match[1]
-      .replace(/<[^>]*>/g, "")
-      .trim();
-
-    if (cleanTitle && cleanTitle.includes("להורדה")) {
-      titles.push(cleanTitle);
-    }
-  }
-
-  console.log("Titles found:", titles.length);
-
-  // קריאת snapshots קיים (אם יש)
-  let snapshots = {};
-  if (fs.existsSync(SNAPSHOTS_PATH)) {
-    try {
-      snapshots = JSON.parse(
-        fs.readFileSync(SNAPSHOTS_PATH, "utf8")
+    if (newTitles.length > 0) {
+      fs.appendFileSync(
+        TITLES_FILE,
+        newTitles.join("\n") + "\n",
+        "utf-8"
       );
-    } catch {
-      snapshots = {};
     }
+
+    console.log("New titles added:", newTitles.length);
+  } catch (err) {
+    console.error("Scan failed:", err.message);
+    process.exit(1);
+  } finally {
+    await browser.close();
   }
-
-  // עדכון snapshot
-  snapshots[TARGET_URL] = {
-    lastScan: new Date().toISOString(),
-    titles,
-  };
-
-  // שמירת JSON
-  fs.writeFileSync(
-    SNAPSHOTS_PATH,
-    JSON.stringify(snapshots, null, 2),
-    "utf8"
-  );
-
-  // שמירת TXT (רק הכותרות)
-  fs.writeFileSync(
-    TITLES_PATH,
-    titles.join("\n"),
-    "utf8"
-  );
-
-  console.log("Scan completed successfully");
 }
 
 run();

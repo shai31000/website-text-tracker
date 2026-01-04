@@ -38,12 +38,15 @@ function cleanTitle(title, blacklist) {
   let cleaned = title;
 
   for (const word of blacklist) {
-    const regex = new RegExp(`\\b${word}\\b`, "gi");
+    // החלפה פשוטה – עובד בעברית, אנגלית וכל שפה
+    const regex = new RegExp(word, "gi");
     cleaned = cleaned.replace(regex, "");
   }
 
+  // ניקוי רווחים מיותרים אחרי ההסרה
   return cleaned.replace(/\s+/g, " ").trim();
 }
+
 
 async function run() {
   console.log("Starting scan...");

@@ -19,6 +19,11 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 const TITLES_FILE = path.join(DATA_DIR, "titles.txt");
 const BLACKLIST_FILE = path.join(DATA_DIR, "blacklist.txt");
 
+const XLSX = require("xlsx");
+
+const EXCEL_FILE = path.join(DATA_DIR, "titles.xlsx");
+
+
 // =======================
 // טעינת מילים שחורות
 // =======================
@@ -118,6 +123,45 @@ function writeTitlesToFile(newTitles) {
   );
 }
 
+function writeTitlesToExcel(newTitles) {
+  if (newTitles.length === 0) return;
+
+  let existingTitles = [];
+
+  // אם הקובץ קיים – נטען אותו
+  if (fs.existsSync(EXCEL_FILE)) {
+    const workbook = XLSX.readFile(EXCEL_FILE);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // דילוג על שורת כותרת
+    existingTitles = rows
+      .slice(1)
+      .map(row => row[0])
+      .filter(Boolean);
+  }
+
+  // חדשות למעלה, ישנות למטה
+  const allTitles = [
+    ...newTitles,
+    ...existingTitles
+  ];
+
+  // בניית נתונים ל-Excel
+  const data = [
+    ["Title"], // כותרת עמודה
+    ...allTitles.map(title => [title])
+  ];
+
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Titles");
+  XLSX.writeFile(workbook, EXCEL_FILE);
+}
+
 // =======================
 // פונקציה ראשית
 // =======================
@@ -147,6 +191,7 @@ async function run() {
   console.log("New titles:", newTitles.length);
 
   writeTitlesToFile(newTitles);
+  writeTitlesToExcel(newTitles);
 }
 
 run().catch(err => {

@@ -51,7 +51,39 @@ function cleanTitle(title, blacklist) {
 }
 
 // =======================
-// 1️⃣ סריקה (כותרת + תאריך + קישור)
+// המרת תאריך עברי לפורמט אחיד
+// =======================
+
+function normalizeDate(rawDate) {
+  if (!rawDate) return "";
+
+  const months = {
+    "ינואר": "01",
+    "פברואר": "02",
+    "מרץ": "03",
+    "אפריל": "04",
+    "מאי": "05",
+    "יוני": "06",
+    "יולי": "07",
+    "אוגוסט": "08",
+    "ספטמבר": "09",
+    "אוקטובר": "10",
+    "נובמבר": "11",
+    "דצמבר": "12"
+  };
+
+  const match = rawDate.match(/(\d{1,2})\s(\S+)\s(\d{4})/);
+  if (!match) return "";
+
+  const day = match[1].padStart(2, "0");
+  const month = months[match[2]] || "01";
+  const year = match[3];
+
+  return `${year}-${month}-${day}`;
+}
+
+// =======================
+// 1️⃣ סריקה
 // =======================
 
 async function scanSite(url) {
@@ -79,9 +111,7 @@ async function scanSite(url) {
         const href = link.getAttribute("href");
 
         let date = "";
-        const detailParagraphs = row.querySelectorAll("p.topicdetails");
-
-        detailParagraphs.forEach(p => {
+        row.querySelectorAll("p.topicdetails").forEach(p => {
           const text = p.innerText.trim();
           if (text.includes(",")) {
             date = text;
@@ -90,7 +120,7 @@ async function scanSite(url) {
 
         results.push({
           title,
-          date,
+          rawDate: date,
           url: href.startsWith("http")
             ? href
             : "http://www.mizrahit.co/" + href.replace("./", "")
@@ -105,22 +135,25 @@ async function scanSite(url) {
 }
 
 // =======================
-// 2️⃣ עיבוד וסינון
+// 2️⃣ עיבוד
 // =======================
 
 function processItems(rawItems, blacklist, existingTitles) {
+  const scanDate = new Date().toISOString().slice(0, 10);
+
   return rawItems
     .map(item => ({
       title: cleanTitle(item.title, blacklist),
-      date: item.date,
-      url: item.url
+      postDate: normalizeDate(item.rawDate),
+      url: item.url,
+      scanDate
     }))
     .filter(item => item.title.length > 0)
     .filter(item => !existingTitles.includes(item.title));
 }
 
 // =======================
-// 3️⃣ כתיבה לקובץ טקסט
+// 3️⃣ כתיבה לטקסט
 // =======================
 
 function writeTitlesToText(newItems) {
@@ -151,25 +184,23 @@ function writeTitlesToExcel(newItems) {
     const wb = XLSX.readFile(EXCEL_FILE);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-    existingRows = rows.slice(1); // בלי כותרת
+    existingRows = rows.slice(1);
   }
 
   const newRows = newItems.map(item => [
     item.title,
-    item.date,
-    item.url
+    item.postDate,
+    item.url,
+    item.scanDate
   ]);
 
   const data = [
-    ["כותרת", "תאריך", "קישור"],
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה"],
     ...newRows,
     ...existingRows
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);
-
-  // RTL
   ws["!rtl"] = true;
 
   const wb = XLSX.utils.book_new();

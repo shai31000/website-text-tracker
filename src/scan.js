@@ -1,28 +1,30 @@
 /**
- * סריקת פורום וחילוץ כותרות פוסטים
- * ניקוי מילים שחורות מקובץ חיצוני
+ * סריקת פורום, ניקוי כותרות וכתיבה היסטורית
+ * הפרדה ברורה בין:
+ * סריקה / עיבוד / כתיבה
  */
 
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 
-// כתובת הפורום
+// =======================
+// הגדרות קבצים וכתובת
+// =======================
+
 const TARGET_URL =
   "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
-// קבצים
-const TITLES_FILE = path.join(__dirname, "..", "data", "titles.txt");
-const BLACKLIST_FILE = path.join(__dirname, "..", "data", "blacklist.txt");
+const DATA_DIR = path.join(__dirname, "..", "data");
+const TITLES_FILE = path.join(DATA_DIR, "titles.txt");
+const BLACKLIST_FILE = path.join(DATA_DIR, "blacklist.txt");
 
-/**
- * קריאת מילים שחורות מקובץ
- */
+// =======================
+// טעינת מילים שחורות
+// =======================
+
 function loadBlacklist() {
-  if (!fs.existsSync(BLACKLIST_FILE)) {
-    console.log("Blacklist file not found, continuing without filtering");
-    return [];
-  }
+  if (!fs.existsSync(BLACKLIST_FILE)) return [];
 
   return fs
     .readFileSync(BLACKLIST_FILE, "utf-8")
@@ -31,29 +33,25 @@ function loadBlacklist() {
     .filter(Boolean);
 }
 
-/**
- * ניקוי כותרת ממילים שחורות
- */
+// =======================
+// ניקוי כותרת
+// =======================
+
 function cleanTitle(title, blacklist) {
   let cleaned = title;
 
   for (const word of blacklist) {
-    // החלפה פשוטה – עובד בעברית, אנגלית וכל שפה
-    const regex = new RegExp(word, "gi");
-    cleaned = cleaned.replace(regex, "");
+    cleaned = cleaned.replace(new RegExp(word, "gi"), "");
   }
 
-  // ניקוי רווחים מיותרים אחרי ההסרה
   return cleaned.replace(/\s+/g, " ").trim();
 }
 
+// =======================
+// 1️⃣ סריקה בלבד
+// =======================
 
-async function run() {
-  console.log("Starting scan...");
-
-  const blacklist = loadBlacklist();
-  console.log("Blacklist words loaded:", blacklist.length);
-
+async function scanSite(url) {
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -62,39 +60,52 @@ async function run() {
   const page = await browser.newPage();
 
   try {
-    await page.goto(TARGET_URL, {
+    await page.goto(url, {
       waitUntil: "domcontentloaded",
       timeout: 60000
     });
 
-    // חילוץ כותרות מה-DOM
-    const rawTitles = await page.$$eval("a.topictitle", els =>
+    const titles = await page.$$eval("a.topictitle", els =>
       els.map(el => el.textContent.trim())
     );
 
-    // ניקוי מילים שחורות
-    const cleanedTitles = rawTitles
-      .map(title => cleanTitle(title, blacklist))
-      .filter(title => title.length > 0);
+    return titles;
+  } finally {
+    await browser.close();
+  }
+}
 
-    console.log("Titles found:", cleanedTitles.length);
+// =======================
+// 2️⃣ עיבוד כותרות
+// =======================
 
-    // קריאה של כותרות קיימות
-    let existingTitles = [];
-    if (fs.existsSync(TITLES_FILE)) {
-      existingTitles = fs
-        .readFileSync(TITLES_FILE, "utf-8")
-        .split("\n")
-        .map(t => t.trim())
-        .filter(Boolean);
-    }
+function processTitles(rawTitles, blacklist, existingTitles) {
+  const cleaned = rawTitles
+    .map(title => cleanTitle(title, blacklist))
+    .filter(title => title.length > 0);
 
-    // מניעת כפילויות
-    const newTitles = cleanedTitles.filter(
-      title => !existingTitles.includes(title)
-    );
+  // החזרת רק כותרות חדשות
+  return cleaned.filter(
+    title => !existingTitles.includes(title)
+  );
+}
 
-    if (newTitles.length > 0) {
+// =======================
+// 3️⃣ כתיבה לקובץ
+// =======================
+
+function writeTitlesToFile(newTitles) {
+  if (newTitles.length === 0) return;
+
+  let existingTitles = [];
+  if (fs.existsSync(TITLES_FILE)) {
+    existingTitles = fs
+      .readFileSync(TITLES_FILE, "utf-8")
+      .split("\n")
+      .map(t => t.trim())
+      .filter(Boolean);
+  }
+
   const updatedTitles = [
     ...newTitles,
     ...existingTitles
@@ -107,14 +118,38 @@ async function run() {
   );
 }
 
+// =======================
+// פונקציה ראשית
+// =======================
 
-    console.log("New titles added:", newTitles.length);
-  } catch (err) {
-    console.error("Scan failed:", err.message);
-    process.exit(1);
-  } finally {
-    await browser.close();
-  }
+async function run() {
+  console.log("Starting scan...");
+
+  const blacklist = loadBlacklist();
+  console.log("Blacklist words:", blacklist.length);
+
+  const existingTitles = fs.existsSync(TITLES_FILE)
+    ? fs.readFileSync(TITLES_FILE, "utf-8")
+        .split("\n")
+        .map(t => t.trim())
+        .filter(Boolean)
+    : [];
+
+  const rawTitles = await scanSite(TARGET_URL);
+  console.log("Raw titles found:", rawTitles.length);
+
+  const newTitles = processTitles(
+    rawTitles,
+    blacklist,
+    existingTitles
+  );
+
+  console.log("New titles:", newTitles.length);
+
+  writeTitlesToFile(newTitles);
 }
 
-run();
+run().catch(err => {
+  console.error("Scan failed:", err.message);
+  process.exit(1);
+});

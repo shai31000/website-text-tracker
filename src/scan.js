@@ -95,12 +95,18 @@ async function run() {
     );
 
     if (newTitles.length > 0) {
-      fs.appendFileSync(
-        TITLES_FILE,
-        newTitles.join("\n") + "\n",
-        "utf-8"
-      );
-    }
+  const updatedTitles = [
+    ...newTitles,
+    ...existingTitles
+  ];
+
+  fs.writeFileSync(
+    TITLES_FILE,
+    updatedTitles.join("\n") + "\n",
+    "utf-8"
+  );
+}
+
 
     console.log("New titles added:", newTitles.length);
   } catch (err) {

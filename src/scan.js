@@ -1,59 +1,49 @@
 /**
- * סריקת פורום, ניקוי כותרות וכתיבה היסטורית
- * הפרדה ברורה בין:
- * סריקה / עיבוד / כתיבה
+ * סריקת פורום, ניקוי כותרות,
+ * ויצוא ל־TXT ו־Excel (RTL, עברית)
  */
 
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
+const XLSX = require("xlsx");
 
 // =======================
-// הגדרות קבצים וכתובת
+// הגדרות
 // =======================
 
 const TARGET_URL =
   "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
 
 const DATA_DIR = path.join(__dirname, "..", "data");
+
 const TITLES_FILE = path.join(DATA_DIR, "titles.txt");
+const EXCEL_FILE = path.join(DATA_DIR, "titles.xlsx");
 const BLACKLIST_FILE = path.join(DATA_DIR, "blacklist.txt");
 
-const XLSX = require("xlsx");
-
-const EXCEL_FILE = path.join(DATA_DIR, "titles.xlsx");
-
-
 // =======================
-// טעינת מילים שחורות
+// מילים שחורות
 // =======================
 
 function loadBlacklist() {
   if (!fs.existsSync(BLACKLIST_FILE)) return [];
 
-  return fs
-    .readFileSync(BLACKLIST_FILE, "utf-8")
+  return fs.readFileSync(BLACKLIST_FILE, "utf-8")
     .split("\n")
     .map(w => w.trim())
     .filter(Boolean);
 }
 
-// =======================
-// ניקוי כותרת
-// =======================
-
 function cleanTitle(title, blacklist) {
   let cleaned = title;
-
   for (const word of blacklist) {
     cleaned = cleaned.replace(new RegExp(word, "gi"), "");
   }
-
   return cleaned.replace(/\s+/g, " ").trim();
 }
 
 // =======================
-// 1️⃣ סריקה בלבד
+// 1️⃣ סריקה
 // =======================
 
 async function scanSite(url) {
@@ -70,128 +60,144 @@ async function scanSite(url) {
       timeout: 60000
     });
 
-    const titles = await page.$$eval("a.topictitle", els =>
-      els.map(el => el.textContent.trim())
-    );
+    return await page.$$eval("tr", rows => {
+      const results = [];
 
-    return titles;
+      rows.forEach(row => {
+        const link = row.querySelector("a.topictitle");
+        const dateCell = row.querySelector("td.row2 p.topicdetails");
+
+        if (!link) return;
+
+        const title = link.textContent.trim();
+        const href = link.getAttribute("href");
+        const date = dateCell ? dateCell.textContent.trim() : "";
+
+        results.push({
+          title,
+          date,
+          url: href.startsWith("http")
+            ? href
+            : "http://www.mizrahit.co/" + href.replace("./", "")
+        });
+      });
+
+      return results;
+    });
+
   } finally {
     await browser.close();
   }
 }
 
 // =======================
-// 2️⃣ עיבוד כותרות
+// 2️⃣ עיבוד
 // =======================
 
-function processTitles(rawTitles, blacklist, existingTitles) {
-  const cleaned = rawTitles
-    .map(title => cleanTitle(title, blacklist))
-    .filter(title => title.length > 0);
-
-  // החזרת רק כותרות חדשות
-  return cleaned.filter(
-    title => !existingTitles.includes(title)
-  );
+function processPosts(rawPosts, blacklist, existingTitles) {
+  return rawPosts
+    .map(p => ({
+      ...p,
+      title: cleanTitle(p.title, blacklist)
+    }))
+    .filter(p =>
+      p.title.length > 0 &&
+      !existingTitles.includes(p.title)
+    );
 }
 
 // =======================
-// 3️⃣ כתיבה לקובץ
+// 3️⃣ כתיבה ל־TXT
 // =======================
 
-function writeTitlesToFile(newTitles) {
-  if (newTitles.length === 0) return;
+function writeTitlesToTxt(newPosts) {
+  if (newPosts.length === 0) return;
 
-  let existingTitles = [];
-  if (fs.existsSync(TITLES_FILE)) {
-    existingTitles = fs
-      .readFileSync(TITLES_FILE, "utf-8")
-      .split("\n")
-      .map(t => t.trim())
-      .filter(Boolean);
-  }
+  const existing = fs.existsSync(TITLES_FILE)
+    ? fs.readFileSync(TITLES_FILE, "utf-8")
+        .split("\n").filter(Boolean)
+    : [];
 
-  const updatedTitles = [
-    ...newTitles,
-    ...existingTitles
+  const updated = [
+    ...newPosts.map(p => p.title),
+    ...existing
   ];
 
   fs.writeFileSync(
     TITLES_FILE,
-    updatedTitles.join("\n") + "\n",
+    updated.join("\n") + "\n",
     "utf-8"
   );
 }
 
-function writeTitlesToExcel(newTitles) {
-  if (newTitles.length === 0) return;
+// =======================
+// 4️⃣ כתיבה ל־Excel (RTL)
+// =======================
 
-  let existingTitles = [];
+function writePostsToExcel(newPosts) {
+  if (newPosts.length === 0) return;
 
-  // אם הקובץ קיים – נטען אותו
+  let existing = [];
+
   if (fs.existsSync(EXCEL_FILE)) {
-    const workbook = XLSX.readFile(EXCEL_FILE);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-
+    const wb = XLSX.readFile(EXCEL_FILE);
+    const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    // דילוג על שורת כותרת
-    existingTitles = rows
-      .slice(1)
-      .map(row => row[0])
-      .filter(Boolean);
+    existing = rows.slice(1).map(r => ({
+      title: r[0],
+      date: r[1],
+      url: r[2]
+    }));
   }
 
-  // חדשות למעלה, ישנות למטה
-  const allTitles = [
-    ...newTitles,
-    ...existingTitles
+  const all = [
+    ...newPosts,
+    ...existing
   ];
 
-  // בניית נתונים ל-Excel
   const data = [
-    ["Title"], // כותרת עמודה
-    ...allTitles.map(title => [title])
+    ["כותרת", "תאריך", "קישור"],
+    ...all.map(p => [p.title, p.date, p.url])
   ];
 
-  const worksheet = XLSX.utils.aoa_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Titles");
-  XLSX.writeFile(workbook, EXCEL_FILE);
+  // RTL
+  wb.Workbook = {
+    Views: [{ RTL: true }]
+  };
+
+  XLSX.utils.book_append_sheet(wb, ws, "פוסטים");
+  XLSX.writeFile(wb, EXCEL_FILE);
 }
 
 // =======================
-// פונקציה ראשית
+// MAIN
 // =======================
 
 async function run() {
   console.log("Starting scan...");
 
   const blacklist = loadBlacklist();
-  console.log("Blacklist words:", blacklist.length);
 
   const existingTitles = fs.existsSync(TITLES_FILE)
     ? fs.readFileSync(TITLES_FILE, "utf-8")
-        .split("\n")
-        .map(t => t.trim())
-        .filter(Boolean)
+        .split("\n").filter(Boolean)
     : [];
 
-  const rawTitles = await scanSite(TARGET_URL);
-  console.log("Raw titles found:", rawTitles.length);
-
-  const newTitles = processTitles(
-    rawTitles,
+  const rawPosts = await scanSite(TARGET_URL);
+  const newPosts = processPosts(
+    rawPosts,
     blacklist,
     existingTitles
   );
 
-  console.log("New titles:", newTitles.length);
+  console.log("New posts:", newPosts.length);
 
-  writeTitlesToFile(newTitles);
-  writeTitlesToExcel(newTitles);
+  writeTitlesToTxt(newPosts);
+  writePostsToExcel(newPosts);
 }
 
 run().catch(err => {

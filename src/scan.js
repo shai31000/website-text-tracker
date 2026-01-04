@@ -65,13 +65,19 @@ async function scanSite(url) {
 
       rows.forEach(row => {
         const link = row.querySelector("a.topictitle");
-        const dateCell = row.querySelector("td.row2 p.topicdetails");
-
         if (!link) return;
 
         const title = link.textContent.trim();
         const href = link.getAttribute("href");
-        const date = dateCell ? dateCell.textContent.trim() : "";
+
+        const details = row.querySelector("p.topicdetails");
+        let date = "";
+        if (details) {
+          const parts = details.innerText.split("\n");
+           date = parts.length > 1
+            ? parts[parts.length - 1].replace("»", "").trim()
+            : "";
+        }
 
         results.push({
           title,
@@ -81,6 +87,7 @@ async function scanSite(url) {
             : "http://www.mizrahit.co/" + href.replace("./", "")
         });
       });
+
 
       return results;
     });

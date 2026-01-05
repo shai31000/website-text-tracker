@@ -146,7 +146,11 @@ async function scanSite() {
         const link = row.querySelector("a.topictitle");
         if (!link) return;
 
-        const dateCell = row.querySelector("p.topicdetails");
+        // 🔧 תיקון: לקחת את תאריך הפוסט האמיתי (האחרון)
+        const dateCells = row.querySelectorAll("p.topicdetails");
+        const dateCell = dateCells.length
+          ? dateCells[dateCells.length - 1]
+          : null;
 
         results.push({
           title: link.textContent.trim(),
@@ -161,6 +165,7 @@ async function scanSite() {
     await browser.close();
   }
 }
+
 
 // =======================
 // 2️⃣ עיבוד

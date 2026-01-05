@@ -86,12 +86,38 @@ function cleanText(text, blacklist) {
 // המרת תאריך לפורמט אחיד
 // =======================
 
-function normalizeDate(raw) {
+function normalizeDate(raw) {function normalizeDate(raw) {
   if (!raw) return "";
-  const d = new Date(raw);
-  if (isNaN(d)) return raw;
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const months = {
+    "ינואר": "01",
+    "פברואר": "02",
+    "מרץ": "03",
+    "אפריל": "04",
+    "מאי": "05",
+    "יוני": "06",
+    "יולי": "07",
+    "אוגוסט": "08",
+    "ספטמבר": "09",
+    "אוקטובר": "10",
+    "נובמבר": "11",
+    "דצמבר": "12"
+  };
+
+  // דוגמה: "03 ינואר 2026, 19:53"
+  const match = raw.match(/(\d{1,2})\s+([^\s]+)\s+(\d{4})/);
+  if (!match) return "";
+
+  const day = match[1].padStart(2, "0");
+  const monthName = match[2];
+  const year = match[3];
+
+  const month = months[monthName];
+  if (!month) return "";
+
+  return `${year}-${month}-${day}`;
 }
+
 
 // =======================
 // 1️⃣ סריקה

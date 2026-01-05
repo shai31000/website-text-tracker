@@ -1,7 +1,8 @@
 /**
- * סריקת פורום, ניקוי כותרות וכתיבה היסטורית
- * הפרדה ברורה בין:
- * סריקה / עיבוד / כתיבה
+ * SCAN.JS
+ * סריקה אוטומטית של פורום
+ * כתיבה לקבצים גלובליים ואתריים
+ * שמירה היסטורית + Excel
  */
 
 const fs = require("fs");
@@ -10,85 +11,93 @@ const puppeteer = require("puppeteer");
 const XLSX = require("xlsx");
 
 // =======================
-// הגדרות
+// הגדרת אתר נוכחי
 // =======================
 
-const TARGET_URL =
-  "http://www.mizrahit.co/viewforum.php?f=44&sid=98e5840e6e4ec72043282e9656706a34";
-
-const DATA_DIR = path.join(__dirname, "..", "data");
-
-const TITLES_FILE = path.join(DATA_DIR, "titles.txt");
-const BLACKLIST_FILE = path.join(DATA_DIR, "blacklist.txt");
-const EXCEL_FILE = path.join(DATA_DIR, "titles.xlsx");
-const HISTORY_FILE = path.join(DATA_DIR, "history.txt");
-
+const SITE = {
+  id: "mizrahit",
+  name: "פורום מזרחית",
+  url: "http://www.mizrahit.co/viewforum.php?f=44"
+};
 
 // =======================
-// טעינת מילים שחורות
+// תיקיות
 // =======================
 
-function loadBlacklist() {
-  if (!fs.existsSync(BLACKLIST_FILE)) return [];
+const BASE_DATA = path.join(__dirname, "..", "data");
 
+const GLOBAL_DIR = path.join(BASE_DATA, "global");
+const SITE_DIR = path.join(BASE_DATA, "sites", SITE.id);
+const ARCHIVE_GLOBAL_DIR = path.join(BASE_DATA, "archive", "global");
+const ARCHIVE_SITE_DIR = path.join(BASE_DATA, "archive", SITE.id);
+
+// יצירת תיקיות אם לא קיימות
+[
+  GLOBAL_DIR,
+  SITE_DIR,
+  ARCHIVE_GLOBAL_DIR,
+  ARCHIVE_SITE_DIR
+].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
+
+// =======================
+// קבצים קבועים
+// =======================
+
+const FILES = {
+  titles: "titles.txt",
+  history: "history.txt",
+  excel: "titles.xlsx",
+  blacklist: "blacklist.txt"
+};
+
+// =======================
+// פונקציות נתיב
+// =======================
+
+const globalFile = name => path.join(GLOBAL_DIR, name);
+const siteFile = name => path.join(SITE_DIR, name);
+
+// =======================
+// טעינת blacklist
+// =======================
+
+function loadBlacklist(filePath) {
+  if (!fs.existsSync(filePath)) return [];
   return fs
-    .readFileSync(BLACKLIST_FILE, "utf-8")
+    .readFileSync(filePath, "utf-8")
     .split("\n")
     .map(w => w.trim())
     .filter(Boolean);
 }
 
 // =======================
-// ניקוי כותרת
+// ניקוי טקסט
 // =======================
 
-function cleanTitle(title, blacklist) {
-  let cleaned = title;
-
-  for (const word of blacklist) {
-    cleaned = cleaned.replace(new RegExp(word, "gi"), "");
-  }
-
-  return cleaned.replace(/\s+/g, " ").trim();
+function cleanText(text, blacklist) {
+  let result = text;
+  blacklist.forEach(word => {
+    result = result.replace(new RegExp(word, "gi"), "");
+  });
+  return result.replace(/\s+/g, " ").trim();
 }
 
 // =======================
-// המרת תאריך עברי לפורמט אחיד
+// המרת תאריך לפורמט אחיד
 // =======================
 
-function normalizeDate(rawDate) {
-  if (!rawDate) return "";
-
-  const months = {
-    "ינואר": "01",
-    "פברואר": "02",
-    "מרץ": "03",
-    "אפריל": "04",
-    "מאי": "05",
-    "יוני": "06",
-    "יולי": "07",
-    "אוגוסט": "08",
-    "ספטמבר": "09",
-    "אוקטובר": "10",
-    "נובמבר": "11",
-    "דצמבר": "12"
-  };
-
-  const match = rawDate.match(/(\d{1,2})\s(\S+)\s(\d{4})/);
-  if (!match) return "";
-
-  const day = match[1].padStart(2, "0");
-  const month = months[match[2]] || "01";
-  const year = match[3];
-
-  return `${year}-${month}-${day}`;
+function normalizeDate(raw) {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (isNaN(d)) return raw;
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 // =======================
 // 1️⃣ סריקה
 // =======================
 
-async function scanSite(url) {
+async function scanSite() {
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -97,7 +106,7 @@ async function scanSite(url) {
   const page = await browser.newPage();
 
   try {
-    await page.goto(url, {
+    await page.goto(SITE.url, {
       waitUntil: "domcontentloaded",
       timeout: 60000
     });
@@ -109,23 +118,12 @@ async function scanSite(url) {
         const link = row.querySelector("a.topictitle");
         if (!link) return;
 
-        const title = link.textContent.trim();
-        const href = link.getAttribute("href");
-
-        let date = "";
-        row.querySelectorAll("p.topicdetails").forEach(p => {
-          const text = p.innerText.trim();
-          if (text.includes(",")) {
-            date = text;
-          }
-        });
+        const dateCell = row.querySelector("p.topicdetails");
 
         results.push({
-          title,
-          rawDate: date,
-          url: href.startsWith("http")
-            ? href
-            : "http://www.mizrahit.co/" + href.replace("./", "")
+          title: link.textContent.trim(),
+          url: link.href,
+          postDate: dateCell ? dateCell.textContent.trim() : ""
         });
       });
 
@@ -140,66 +138,79 @@ async function scanSite(url) {
 // 2️⃣ עיבוד
 // =======================
 
-function processItems(rawItems, blacklist, existingTitles) {
+function processItems(items, blacklist, existingTitles) {
   const scanDate = new Date().toISOString().slice(0, 10);
 
-  return rawItems
-    .map(item => ({
-      title: cleanTitle(item.title, blacklist),
-      postDate: normalizeDate(item.rawDate),
-      url: item.url,
-      scanDate
-    }))
-    .filter(item => item.title.length > 0)
-    .filter(item => !existingTitles.includes(item.title));
+  return items
+    .map(item => {
+      const cleanTitle = cleanText(item.title, blacklist);
+      if (!cleanTitle) return null;
+      if (existingTitles.includes(cleanTitle)) return null;
+
+      return {
+        title: cleanTitle,
+        url: item.url,
+        postDate: normalizeDate(item.postDate),
+        scanDate
+      };
+    })
+    .filter(Boolean);
 }
 
 // =======================
-// 3️⃣ כתיבה לטקסט
+// 3️⃣ כתיבה לקבצי טקסט
 // =======================
 
-function writeTitlesToText(newItems) {
-  if (newItems.length === 0) return;
-
-  const existing = fs.existsSync(TITLES_FILE)
-    ? fs.readFileSync(TITLES_FILE, "utf-8").trim().split("\n")
-    : [];
-
-  const updated = [
-    ...newItems.map(i => i.title),
-    ...existing
-  ];
-
-  fs.writeFileSync(TITLES_FILE, updated.join("\n") + "\n", "utf-8");
+function prependLines(filePath, lines) {
+  const existing = fs.existsSync(filePath)
+    ? fs.readFileSync(filePath, "utf-8")
+    : "";
+  fs.writeFileSync(filePath, lines.join("\n") + "\n" + existing);
 }
 
-// =======================
-// 4️⃣ כתיבה ל-Excel (RTL)
-// =======================
+function writeTextFiles(newItems) {
+  if (!newItems.length) return;
 
-function writeTitlesToExcel(newItems) {
-  if (newItems.length === 0) return;
+  // titles.txt
+  const titles = newItems.map(i => i.title);
+  prependLines(globalFile(FILES.titles), titles);
+  prependLines(siteFile(FILES.titles), titles);
 
-  let existingRows = [];
-
-  if (fs.existsSync(EXCEL_FILE)) {
-    const wb = XLSX.readFile(EXCEL_FILE);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    existingRows = rows.slice(1);
-  }
-
-  const newRows = newItems.map(item => [
-    item.title,
-    item.postDate,
-    item.url,
-    item.scanDate
+  // history.txt
+  const historyLines = newItems.flatMap(i => [
+    i.title,
+    i.url,
+    i.postDate,
+    i.scanDate,
+    ""
   ]);
+
+  prependLines(globalFile(FILES.history), historyLines);
+  prependLines(siteFile(FILES.history), historyLines);
+}
+
+// =======================
+// 4️⃣ כתיבה ל-Excel
+// =======================
+
+function writeExcel(newItems) {
+  if (!newItems.length) return;
+
+  const loadRows = file => {
+    if (!fs.existsSync(file)) return [];
+    const wb = XLSX.readFile(file);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1);
+  };
+
+  const rows = [
+    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate]),
+    ...loadRows(globalFile(FILES.excel))
+  ];
 
   const data = [
     ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה"],
-    ...newRows,
-    ...existingRows
+    ...rows
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -208,74 +219,65 @@ function writeTitlesToExcel(newItems) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Titles");
 
-  XLSX.writeFile(wb, EXCEL_FILE);
+  XLSX.writeFile(wb, globalFile(FILES.excel));
+  XLSX.writeFile(wb, siteFile(FILES.excel));
 }
 
 // =======================
-// 5️⃣ כתיבה לקובץ היסטורי מפורט
+// 5️⃣ שמירת ארכיון ריצה
 // =======================
 
-function writeHistoryFile(newItems) {
-  if (newItems.length === 0) return;
+function archiveRun(items) {
+  if (!items.length) return;
 
-  let existingContent = "";
-  if (fs.existsSync(HISTORY_FILE)) {
-    existingContent = fs.readFileSync(HISTORY_FILE, "utf-8");
-  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 
-  const scanBlocks = newItems
-    .map(item => {
-      return [
-        item.title,
-        item.url,
-        item.postDate,
-        item.scanDate
-      ].join("\n");
-    })
-    .join("\n");
+  const baseLines = items.flatMap(i => [
+    i.title,
+    i.url,
+    i.postDate,
+    i.scanDate,
+    ""
+  ]);
 
-  const finalContent =
-    scanBlocks +
-    "\n" +
-    existingContent;
+  fs.writeFileSync(
+    path.join(ARCHIVE_GLOBAL_DIR, `scan-${stamp}.txt`),
+    baseLines.join("\n")
+  );
 
-  fs.writeFileSync(HISTORY_FILE, finalContent.trim() + "\n", "utf-8");
+  fs.writeFileSync(
+    path.join(ARCHIVE_SITE_DIR, `scan-${stamp}.txt`),
+    baseLines.join("\n")
+  );
 }
-
 
 // =======================
 // פונקציה ראשית
 // =======================
 
 async function run() {
-  console.log("Starting scan...");
+  console.log("Starting scan:", SITE.name);
 
-  const blacklist = loadBlacklist();
+  const blacklist = [
+    ...loadBlacklist(globalFile(FILES.blacklist)),
+    ...loadBlacklist(siteFile(FILES.blacklist))
+  ];
 
-  const existingTitles = fs.existsSync(TITLES_FILE)
-    ? fs.readFileSync(TITLES_FILE, "utf-8")
-        .split("\n")
-        .map(t => t.trim())
-        .filter(Boolean)
+  const existingTitles = fs.existsSync(globalFile(FILES.titles))
+    ? fs.readFileSync(globalFile(FILES.titles), "utf-8").split("\n")
     : [];
 
-  const rawItems = await scanSite(TARGET_URL);
-  console.log("Items found:", rawItems.length);
-
-  const newItems = processItems(
-    rawItems,
-    blacklist,
-    existingTitles
-  );
+  const scanned = await scanSite();
+  const newItems = processItems(scanned, blacklist, existingTitles);
 
   console.log("New items:", newItems.length);
 
-  writeTitlesToText(newItems);
-  writeTitlesToExcel(newItems);
-  writeHistoryFile(newItems);
+  writeTextFiles(newItems);
+  writeExcel(newItems);
+  archiveRun(newItems);
 }
 
 run().catch(err => {
-  console.error("Scan failed:", err.message);
+  console.error("Scan failed:", err);
   process.exit(1);
 });

@@ -83,12 +83,13 @@ function cleanText(text, blacklist) {
 }
 
 // =======================
-// המרת תאריך לפורמט אחיד
+// ✅ תיקון: המרת תאריך עברי לפורמט אחיד
 // =======================
 
-function normalizeDate(raw) {function normalizeDate(raw) {
+function normalizeDate(raw) {
   if (!raw) return "";
 
+  // מפת חודשים בעברית
   const months = {
     "ינואר": "01",
     "פברואר": "02",
@@ -105,19 +106,20 @@ function normalizeDate(raw) {function normalizeDate(raw) {
   };
 
   // דוגמה: "03 ינואר 2026, 19:53"
-  const match = raw.match(/(\d{1,2})\s+([^\s]+)\s+(\d{4})/);
-  if (!match) return "";
+  const clean = raw.replace(",", "").trim();
+  const parts = clean.split(/\s+/);
 
-  const day = match[1].padStart(2, "0");
-  const monthName = match[2];
-  const year = match[3];
+  if (parts.length < 3) return raw;
+
+  const day = parts[0].padStart(2, "0");
+  const monthName = parts[1];
+  const year = parts[2];
 
   const month = months[monthName];
-  if (!month) return "";
+  if (!month) return raw;
 
   return `${year}-${month}-${day}`;
 }
-
 
 // =======================
 // 1️⃣ סריקה

@@ -147,10 +147,10 @@ async function scanSite() {
         if (!link) return;
 
         // 🔧 תיקון: לקחת את תאריך הפוסט האמיתי (האחרון)
-        const dateCells = row.querySelectorAll("p.topicdetails");
-        const dateCell = dateCells.length
-          ? dateCells[dateCells.length - 1]
-          : null;
+        const dateCell = row.querySelector(
+          'p.topicdetails[style*="white-space"]'
+        );
+
 
         results.push({
           title: link.textContent.trim(),

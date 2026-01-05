@@ -21,6 +21,8 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 const TITLES_FILE = path.join(DATA_DIR, "titles.txt");
 const BLACKLIST_FILE = path.join(DATA_DIR, "blacklist.txt");
 const EXCEL_FILE = path.join(DATA_DIR, "titles.xlsx");
+const HISTORY_FILE = path.join(DATA_DIR, "history.txt");
+
 
 // =======================
 // טעינת מילים שחורות
@@ -210,6 +212,38 @@ function writeTitlesToExcel(newItems) {
 }
 
 // =======================
+// 5️⃣ כתיבה לקובץ היסטורי מפורט
+// =======================
+
+function writeHistoryFile(newItems) {
+  if (newItems.length === 0) return;
+
+  let existingContent = "";
+  if (fs.existsSync(HISTORY_FILE)) {
+    existingContent = fs.readFileSync(HISTORY_FILE, "utf-8");
+  }
+
+  const scanBlocks = newItems
+    .map(item => {
+      return [
+        item.title,
+        item.url,
+        item.postDate,
+        item.scanDate
+      ].join("\n");
+    })
+    .join("\n");
+
+  const finalContent =
+    scanBlocks +
+    "\n" +
+    existingContent;
+
+  fs.writeFileSync(HISTORY_FILE, finalContent.trim() + "\n", "utf-8");
+}
+
+
+// =======================
 // פונקציה ראשית
 // =======================
 
@@ -238,6 +272,7 @@ async function run() {
 
   writeTitlesToText(newItems);
   writeTitlesToExcel(newItems);
+  writeHistoryFile(newItems);
 }
 
 run().catch(err => {

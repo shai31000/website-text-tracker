@@ -14,6 +14,8 @@ const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 const XLSX = require("xlsx");
+const { writeTitles, writeHistory } = require("./writers/textWriter");
+
 
 // =======================
 // הגדרת אתר נוכחי
@@ -196,38 +198,6 @@ function processItems(items, blacklist, existingTitles) {
 }
 
 // =======================
-// 3️⃣ כתיבה לקבצי טקסט
-// =======================
-
-function prependLines(filePath, lines) {
-  const existing = fs.existsSync(filePath)
-    ? fs.readFileSync(filePath, "utf-8")
-    : "";
-  fs.writeFileSync(filePath, lines.join("\n") + "\n" + existing);
-}
-
-function writeTextFiles(newItems) {
-  if (!newItems.length) return;
-
-  // titles.txt
-  const titles = newItems.map(i => i.title);
-  prependLines(globalFile(FILES.titles), titles);
-  prependLines(siteFile(FILES.titles), titles);
-
-  // history.txt
-  const historyLines = newItems.flatMap(i => [
-    i.title,
-    i.url,
-    i.postDate,
-    i.scanDate,
-    ""
-  ]);
-
-  prependLines(globalFile(FILES.history), historyLines);
-  prependLines(siteFile(FILES.history), historyLines);
-}
-
-// =======================
 // 4️⃣ כתיבה ל-Excel
 // =======================
 
@@ -310,7 +280,13 @@ async function run() {
 
   console.log("New items:", newItems.length);
 
-  writeTextFiles(newItems);
+  // כתיבה לקבצי TXT – דרך writer ייעודי
+writeTitles(globalFile(FILES.titles), newItems);
+writeTitles(siteFile(FILES.titles), newItems);
+
+writeHistory(globalFile(FILES.history), newItems);
+writeHistory(siteFile(FILES.history), newItems);
+
   writeExcel(newItems);
   archiveRun(newItems);
 }

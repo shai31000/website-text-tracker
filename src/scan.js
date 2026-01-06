@@ -1,9 +1,14 @@
+
+
 /**
  * SCAN.JS
  * סריקה אוטומטית של פורום
  * כתיבה לקבצים גלובליים ואתריים
  * שמירה היסטורית + Excel
  */
+
+```js
+import { ensureDir, getScanTimestamp, getRunFolderName } from './utils/helpers.js';
 
 const fs = require("fs");
 const path = require("path");

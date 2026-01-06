@@ -26,7 +26,7 @@ jobs:
         run: npm install
 
       - name: Run scan script
-        run: node src/scan.js
+        run: node src/main.js
 
 
       - name: Commit and push changes

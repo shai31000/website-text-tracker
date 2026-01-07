@@ -156,6 +156,8 @@ async function scanSite(site) {
       console.log("Total results:", results.length);
       return results;
     });
+
+    return results;
   } finally {
     await browser.close();
   }

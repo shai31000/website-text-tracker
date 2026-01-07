@@ -297,9 +297,10 @@ function archiveRun(items, archiveDir) {
 // =======================
 
 async function scanAndProcess(site, globalBlacklist, existingTitles) {
-  const siteDir = path.join(BASE_DATA, "sites", site.id);
-  const archiveSiteDir = path.join(BASE_DATA, "archive", site.id);
-  [siteDir, archiveSiteDir].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
+  const tagDir = path.join(BASE_DATA, "tags", site.tag);
+  const siteDir = path.join(tagDir, "sites", site.id);
+  const archiveSiteDir = path.join(tagDir, "archive", site.id);
+  [tagDir, siteDir, archiveSiteDir].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
 
   const siteFile = name => path.join(siteDir, name);
 

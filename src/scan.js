@@ -233,7 +233,7 @@ function writeExcel(newItems, filePath) {
   };
 
   const rows = [
-    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate]),
+    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.tag]),
     ...loadRows(filePath)
   ];
 

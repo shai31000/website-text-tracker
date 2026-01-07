@@ -127,7 +127,8 @@ async function scanSite(site) {
       timeout: 60000
     });
 
-    return await page.$eval("tr", trs => {
+    const results = await page.evaluate(() => {
+      const trs = document.querySelectorAll("tr");
       console.log("Found tr elements:", trs.length);
       const results = [];
 

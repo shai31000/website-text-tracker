@@ -127,10 +127,10 @@ async function scanSite(site) {
       timeout: 60000
     });
 
-    return await page.$eval("tr", rows => {
+    return await page.$eval("tr", trs => {
       const results = [];
 
-      rows.forEach(row => {
+      trs.forEach(row => {
         const link = row.querySelector("a.topictitle");
         if (!link) return;
 

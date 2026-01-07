@@ -259,6 +259,14 @@ function archiveRun(items, archiveDir) {
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 
+  // Plain text titles
+  const titles = items.map(i => i.title);
+  fs.writeFileSync(
+    path.join(archiveDir, `scan-${stamp}-titles.txt`),
+    titles.join("\n")
+  );
+
+  // Metadata text
   const baseLines = items.flatMap(i => [
     i.title,
     i.url,
@@ -266,11 +274,22 @@ function archiveRun(items, archiveDir) {
     i.scanDate,
     ""
   ]);
-
   fs.writeFileSync(
-    path.join(archiveDir, `scan-${stamp}.txt`),
+    path.join(archiveDir, `scan-${stamp}-history.txt`),
     baseLines.join("\n")
   );
+
+  // Excel
+  const excelPath = path.join(archiveDir, `scan-${stamp}.xlsx`);
+  const data = [
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה"],
+    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate])
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!rtl"] = true;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Titles");
+  XLSX.writeFile(wb, excelPath);
 }
 
 // =======================

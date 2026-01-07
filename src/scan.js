@@ -34,7 +34,7 @@ const ARCHIVE_GLOBAL_DIR = path.join(BASE_DATA, "archive", "global");
 
 const FILES = {
   titles: "titles.txt",
-  history: "history.txt",
+  fulldata: "fulldata.txt",
   excel: "titles.xlsx",
   blacklist: "blacklist.txt"
 };
@@ -205,8 +205,8 @@ function writeTextFiles(newItems, fileFunc) {
   const titles = newItems.map(i => i.title);
   prependLines(fileFunc(FILES.titles), titles);
 
-  // history.txt
-  const historyLines = newItems.flatMap(i => [
+  // fulldata.txt
+  const fulldataLines = newItems.flatMap(i => [
     i.title,
     i.url,
     i.postDate,
@@ -214,7 +214,7 @@ function writeTextFiles(newItems, fileFunc) {
     ""
   ]);
 
-  prependLines(fileFunc(FILES.history), historyLines);
+  prependLines(fileFunc(FILES.fulldata), fulldataLines);
 }
 
 // =======================
@@ -275,7 +275,7 @@ function archiveRun(items, archiveDir) {
     ""
   ]);
   fs.writeFileSync(
-    path.join(archiveDir, `scan-${stamp}-history.txt`),
+    path.join(archiveDir, `scan-${stamp}-fulldata.txt`),
     baseLines.join("\n")
   );
 
@@ -328,15 +328,39 @@ async function run() {
     ? fs.readFileSync(globalFile(FILES.titles), "utf-8").split("\n").map(t => t.trim()).filter(Boolean)
     : [];
 
+  // Group sites by tag
+  const tagGroups = {};
+  for (const site of sites) {
+    if (!tagGroups[site.tag]) tagGroups[site.tag] = [];
+    tagGroups[site.tag].push(site);
+  }
+
   let allNewItems = [];
 
-  for (const site of sites) {
-    console.log("Starting scan:", site.name);
+  for (const tag in tagGroups) {
+    const sitesInTag = tagGroups[tag];
+    let tagNewItems = [];
 
-    const newItems = await scanAndProcess(site, globalBlacklist, existingTitles);
-    allNewItems.push(...newItems);
+    for (const site of sitesInTag) {
+      console.log("Starting scan:", site.name);
 
-    console.log("New items for", site.name, ":", newItems.length);
+      const newItems = await scanAndProcess(site, globalBlacklist, existingTitles);
+      tagNewItems.push(...newItems);
+
+      console.log("New items for", site.name, ":", newItems.length);
+    }
+
+    // Write tag global
+    if (tagNewItems.length) {
+      const tagGlobalDir = path.join(BASE_DATA, "tags", tag, "global");
+      fs.mkdirSync(tagGlobalDir, { recursive: true });
+      const tagGlobalFile = name => path.join(tagGlobalDir, name);
+
+      writeTextFiles(tagNewItems, tagGlobalFile);
+      writeExcel(tagNewItems, tagGlobalFile(FILES.excel));
+    }
+
+    allNewItems.push(...tagNewItems);
   }
 
   console.log("Total new items:", allNewItems.length);

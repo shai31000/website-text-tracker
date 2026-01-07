@@ -211,6 +211,7 @@ function writeTextFiles(newItems, fileFunc) {
     i.url,
     i.postDate,
     i.scanDate,
+    i.tag,
     ""
   ]);
 
@@ -228,7 +229,7 @@ function writeExcel(newItems, filePath) {
     if (!fs.existsSync(file)) return [];
     const wb = XLSX.readFile(file);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1);
+    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, ""]); // Add empty tag for old rows
   };
 
   const rows = [
@@ -237,7 +238,7 @@ function writeExcel(newItems, filePath) {
   ];
 
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה"],
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תגית"],
     ...rows
   ];
 
@@ -272,6 +273,7 @@ function archiveRun(items, archiveDir) {
     i.url,
     i.postDate,
     i.scanDate,
+    i.tag,
     ""
   ]);
   fs.writeFileSync(
@@ -282,8 +284,8 @@ function archiveRun(items, archiveDir) {
   // Excel
   const excelPath = path.join(archiveDir, `scan-${stamp}.xlsx`);
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה"],
-    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate])
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תגית"],
+    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.tag])
   ];
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!rtl"] = true;
@@ -307,6 +309,7 @@ async function scanAndProcess(site, globalBlacklist, existingTitles) {
   const siteBlacklist = loadBlacklist(siteFile(FILES.blacklist));
   const scanned = await scanSite(site);
   const newItems = processItems(scanned, [...globalBlacklist, ...siteBlacklist], existingTitles);
+  newItems.forEach(item => item.tag = site.tag);
 
   if (newItems.length) {
     writeTextFiles(newItems, siteFile);

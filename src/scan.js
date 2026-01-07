@@ -128,17 +128,22 @@ async function scanSite(site) {
     });
 
     return await page.$eval("tr", trs => {
+      console.log("Found tr elements:", trs.length);
       const results = [];
 
       trs.forEach(row => {
+        console.log("Processing row:", row.textContent.substring(0, 100));
         const link = row.querySelector("a.topictitle");
-        if (!link) return;
+        if (!link) {
+          console.log("No link in row");
+          return;
+        }
+        console.log("Found link:", link.textContent.trim());
 
         // 🔧 תיקון: לקחת את תאריך הפוסט האמיתי (האחרון)
         const dateCell = row.querySelector(
           'p.topicdetails[style*="white-space"]'
         );
-
 
         results.push({
           title: link.textContent.trim(),
@@ -147,6 +152,7 @@ async function scanSite(site) {
         });
       });
 
+      console.log("Total results:", results.length);
       return results;
     });
   } finally {

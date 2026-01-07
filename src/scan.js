@@ -1,5 +1,3 @@
-
-
 /**
  * SCAN.JS
  * סריקה אוטומטית של פורום
@@ -7,25 +5,16 @@
  * שמירה היסטורית + Excel
  */
 
-```js
-import { ensureDir, getScanTimestamp, getRunFolderName } from './utils/helpers.js';
-
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 const XLSX = require("xlsx");
-const { writeTitles, writeHistory } = require("./writers/textWriter");
-
 
 // =======================
-// הגדרת אתר נוכחי
+// טעינת אתרים מהקונפיג
 // =======================
 
-const SITE = {
-  id: "mizrahit",
-  name: "פורום מזרחית",
-  url: "http://www.mizrahit.co/viewforum.php?f=44"
-};
+const sites = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "sites.json"), "utf-8"));
 
 // =======================
 // תיקיות
@@ -34,17 +23,10 @@ const SITE = {
 const BASE_DATA = path.join(__dirname, "..", "data");
 
 const GLOBAL_DIR = path.join(BASE_DATA, "global");
-const SITE_DIR = path.join(BASE_DATA, "sites", SITE.id);
 const ARCHIVE_GLOBAL_DIR = path.join(BASE_DATA, "archive", "global");
-const ARCHIVE_SITE_DIR = path.join(BASE_DATA, "archive", SITE.id);
 
-// יצירת תיקיות אם לא קיימות
-[
-  GLOBAL_DIR,
-  SITE_DIR,
-  ARCHIVE_GLOBAL_DIR,
-  ARCHIVE_SITE_DIR
-].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
+// יצירת תיקיות גלובליות אם לא קיימות
+[GLOBAL_DIR, ARCHIVE_GLOBAL_DIR].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
 
 // =======================
 // קבצים קבועים
@@ -62,7 +44,6 @@ const FILES = {
 // =======================
 
 const globalFile = name => path.join(GLOBAL_DIR, name);
-const siteFile = name => path.join(SITE_DIR, name);
 
 // =======================
 // טעינת blacklist
@@ -132,7 +113,7 @@ function normalizeDate(raw) {
 // 1️⃣ סריקה
 // =======================
 
-async function scanSite() {
+async function scanSite(site) {
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -141,12 +122,12 @@ async function scanSite() {
   const page = await browser.newPage();
 
   try {
-    await page.goto(SITE.url, {
+    await page.goto(site.url, {
       waitUntil: "domcontentloaded",
       timeout: 60000
     });
 
-    return await page.$$eval("tr", rows => {
+    return await page.$eval("tr", rows => {
       const results = [];
 
       rows.forEach(row => {
@@ -198,10 +179,40 @@ function processItems(items, blacklist, existingTitles) {
 }
 
 // =======================
+// 3️⃣ כתיבה לקבצי טקסט
+// =======================
+
+function prependLines(filePath, lines) {
+  const existing = fs.existsSync(filePath)
+    ? fs.readFileSync(filePath, "utf-8")
+    : "";
+  fs.writeFileSync(filePath, lines.join("\n") + "\n" + existing);
+}
+
+function writeTextFiles(newItems, fileFunc) {
+  if (!newItems.length) return;
+
+  // titles.txt
+  const titles = newItems.map(i => i.title);
+  prependLines(fileFunc(FILES.titles), titles);
+
+  // history.txt
+  const historyLines = newItems.flatMap(i => [
+    i.title,
+    i.url,
+    i.postDate,
+    i.scanDate,
+    ""
+  ]);
+
+  prependLines(fileFunc(FILES.history), historyLines);
+}
+
+// =======================
 // 4️⃣ כתיבה ל-Excel
 // =======================
 
-function writeExcel(newItems) {
+function writeExcel(newItems, filePath) {
   if (!newItems.length) return;
 
   const loadRows = file => {
@@ -213,7 +224,7 @@ function writeExcel(newItems) {
 
   const rows = [
     ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate]),
-    ...loadRows(globalFile(FILES.excel))
+    ...loadRows(filePath)
   ];
 
   const data = [
@@ -227,15 +238,14 @@ function writeExcel(newItems) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Titles");
 
-  XLSX.writeFile(wb, globalFile(FILES.excel));
-  XLSX.writeFile(wb, siteFile(FILES.excel));
+  XLSX.writeFile(wb, filePath);
 }
 
 // =======================
 // 5️⃣ שמירת ארכיון ריצה
 // =======================
 
-function archiveRun(items) {
+function archiveRun(items, archiveDir) {
   if (!items.length) return;
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -249,14 +259,33 @@ function archiveRun(items) {
   ]);
 
   fs.writeFileSync(
-    path.join(ARCHIVE_GLOBAL_DIR, `scan-${stamp}.txt`),
+    path.join(archiveDir, `scan-${stamp}.txt`),
     baseLines.join("\n")
   );
+}
 
-  fs.writeFileSync(
-    path.join(ARCHIVE_SITE_DIR, `scan-${stamp}.txt`),
-    baseLines.join("\n")
-  );
+// =======================
+// עיבוד אתר יחיד
+// =======================
+
+async function scanAndProcess(site, globalBlacklist, existingTitles) {
+  const siteDir = path.join(BASE_DATA, "sites", site.id);
+  const archiveSiteDir = path.join(BASE_DATA, "archive", site.id);
+  [siteDir, archiveSiteDir].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
+
+  const siteFile = name => path.join(siteDir, name);
+
+  const siteBlacklist = loadBlacklist(siteFile(FILES.blacklist));
+  const scanned = await scanSite(site);
+  const newItems = processItems(scanned, [...globalBlacklist, ...siteBlacklist], existingTitles);
+
+  if (newItems.length) {
+    writeTextFiles(newItems, siteFile);
+    writeExcel(newItems, siteFile(FILES.excel));
+    archiveRun(newItems, archiveSiteDir);
+  }
+
+  return newItems;
 }
 
 // =======================
@@ -264,31 +293,30 @@ function archiveRun(items) {
 // =======================
 
 async function run() {
-  console.log("Starting scan:", SITE.name);
-
-  const blacklist = [
-    ...loadBlacklist(globalFile(FILES.blacklist)),
-    ...loadBlacklist(siteFile(FILES.blacklist))
-  ];
+  const globalBlacklist = loadBlacklist(globalFile(FILES.blacklist));
 
   const existingTitles = fs.existsSync(globalFile(FILES.titles))
-    ? fs.readFileSync(globalFile(FILES.titles), "utf-8").split("\n")
+    ? fs.readFileSync(globalFile(FILES.titles), "utf-8").split("\n").map(t => t.trim()).filter(Boolean)
     : [];
 
-  const scanned = await scanSite();
-  const newItems = processItems(scanned, blacklist, existingTitles);
+  let allNewItems = [];
 
-  console.log("New items:", newItems.length);
+  for (const site of sites) {
+    console.log("Starting scan:", site.name);
 
-  // כתיבה לקבצי TXT – דרך writer ייעודי
-writeTitles(globalFile(FILES.titles), newItems);
-writeTitles(siteFile(FILES.titles), newItems);
+    const newItems = await scanAndProcess(site, globalBlacklist, existingTitles);
+    allNewItems.push(...newItems);
 
-writeHistory(globalFile(FILES.history), newItems);
-writeHistory(siteFile(FILES.history), newItems);
+    console.log("New items for", site.name, ":", newItems.length);
+  }
 
-  writeExcel(newItems);
-  archiveRun(newItems);
+  console.log("Total new items:", allNewItems.length);
+
+  if (allNewItems.length) {
+    writeTextFiles(allNewItems, globalFile);
+    writeExcel(allNewItems, globalFile(FILES.excel));
+    archiveRun(allNewItems, ARCHIVE_GLOBAL_DIR);
+  }
 }
 
 run().catch(err => {

@@ -26,5 +26,12 @@
     "url": "https://yosmusic.com/category/%d7%a1%d7%99%d7%a0%d7%92%d7%9c%d7%99%d7%9d-%d7%97%d7%93%d7%a9%d7%99%d7%9d/",
     "tag": "סינגלים חדשים",
     "type": "yosmusic"
+  },
+  {
+    "id": "rotter",
+    "name": "פורום רוטר אלבומים",
+    "url": "https://rotter.name/cgi-bin/nor/dcboard.cgi?az=list&forum=music",
+    "tag": "אלבומים חדשים",
+    "type": "rotter"
   }
 ]

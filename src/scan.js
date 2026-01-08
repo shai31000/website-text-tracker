@@ -104,6 +104,15 @@ function normalizeDate(raw) {
       const year = parts[2];
       return `${year}-${month}-${day}`;
     }
+  } else if (clean.includes(".")) {
+    // דוגמה: "31.12.25"
+    const parts = clean.split(".");
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = "20" + parts[2];
+      return `${year}-${month}-${day}`;
+    }
   } else {
     // דוגמה: "03 ינואר 2026, 19:53"
     const parts = clean.split(/\s+/);
@@ -151,6 +160,8 @@ async function scanSite(site) {
         elements = document.querySelectorAll("tr");
       } else if (siteType === "yosmusic") {
         elements = document.querySelectorAll(".elementor-post__card");
+      } else if (siteType === "rotter") {
+        elements = document.querySelectorAll("tr");
       } else {
         return [];
       }
@@ -182,6 +193,21 @@ async function scanSite(site) {
           postDate = dateEl ? dateEl.textContent.trim() : "";
           const descEl = el.querySelector("div.elementor-post__excerpt p");
           desc = descEl ? descEl.textContent.trim() : "";
+        } else if (siteType === "rotter") {
+          titleEl = el.querySelector("b");
+          if (!titleEl) {
+            console.log("No b in row");
+            return;
+          }
+          let link = titleEl.closest("a");
+          if (!link) {
+            console.log("No a around b");
+            return;
+          }
+          url = link.href;
+          const dateFont = el.querySelector("td font[size='1']");
+          postDate = dateFont ? dateFont.textContent.split('<')[0].trim() : "";
+          desc = "";
         }
 
         console.log("Found title:", titleEl.textContent.trim());

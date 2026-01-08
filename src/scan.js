@@ -93,20 +93,32 @@ function normalizeDate(raw) {
     "דצמבר": "12"
   };
 
-  // דוגמה: "03 ינואר 2026, 19:53"
   const clean = raw.replace(",", "").trim();
-  const parts = clean.split(/\s+/);
 
-  if (parts.length < 3) return raw;
+  if (clean.includes("/")) {
+    // דוגמה: "17/08/2025"
+    const parts = clean.split("/");
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, "0");
+      const month = parts[1].padStart(2, "0");
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  } else {
+    // דוגמה: "03 ינואר 2026, 19:53"
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 3) {
+      const day = parts[0].padStart(2, "0");
+      const monthName = parts[1];
+      const year = parts[2];
+      const month = months[monthName];
+      if (month) {
+        return `${year}-${month}-${day}`;
+      }
+    }
+  }
 
-  const day = parts[0].padStart(2, "0");
-  const monthName = parts[1];
-  const year = parts[2];
-
-  const month = months[monthName];
-  if (!month) return raw;
-
-  return `${year}-${month}-${day}`;
+  return raw;
 }
 
 // =======================
@@ -127,35 +139,58 @@ async function scanSite(site) {
       timeout: 60000
     });
 
-    const results = await page.evaluate(() => {
-      const trs = document.querySelectorAll("tr");
-      console.log("Found tr elements:", trs.length);
+    const results = await page.evaluate((siteType) => {
+      let elements;
+      if (siteType === "forum") {
+        elements = document.querySelectorAll("tr");
+      } else if (siteType === "yosmusic") {
+        elements = document.querySelectorAll(".elementor-post__card");
+      } else {
+        return [];
+      }
+
+      console.log("Found elements:", elements.length);
       const results = [];
 
-      trs.forEach(row => {
-        console.log("Processing row:", row.textContent.substring(0, 100));
-        const link = row.querySelector("a.topictitle");
-        if (!link) {
-          console.log("No link in row");
-          return;
-        }
-        console.log("Found link:", link.textContent.trim());
+      elements.forEach(el => {
+        console.log("Processing element:", el.textContent.substring(0, 100));
+        let titleEl, url, postDate = "", desc = "";
 
-        // 🔧 תיקון: לקחת את תאריך הפוסט האמיתי (האחרון)
-        const dateCell = row.querySelector(
-          'p.topicdetails[style*="white-space"]'
-        );
+        if (siteType === "forum") {
+          titleEl = el.querySelector("a.topictitle");
+          if (!titleEl) {
+            console.log("No link in row");
+            return;
+          }
+          url = titleEl.href;
+          const dateCell = el.querySelector('p.topicdetails[style*="white-space"]');
+          postDate = dateCell ? dateCell.textContent.trim() : "";
+        } else if (siteType === "yosmusic") {
+          titleEl = el.querySelector("h3.elementor-post__title a");
+          if (!titleEl) {
+            console.log("No title in card");
+            return;
+          }
+          url = titleEl.href;
+          const dateEl = el.querySelector("span.elementor-post-date");
+          postDate = dateEl ? dateEl.textContent.trim() : "";
+          const descEl = el.querySelector("div.elementor-post__excerpt p");
+          desc = descEl ? descEl.textContent.trim() : "";
+        }
+
+        console.log("Found title:", titleEl.textContent.trim());
 
         results.push({
-          title: link.textContent.trim(),
-          url: link.href,
-          postDate: dateCell ? dateCell.textContent.trim() : ""
+          title: titleEl.textContent.trim(),
+          url,
+          postDate,
+          desc
         });
       });
 
       console.log("Total results:", results.length);
       return results;
-    });
+    }, site.type);
 
     return results;
   } finally {
@@ -181,7 +216,8 @@ function processItems(items, blacklist, existingTitles) {
         title: cleanTitle,
         url: item.url,
         postDate: normalizeDate(item.postDate),
-        scanDate
+        scanDate,
+        desc: item.desc || ""
       };
     })
     .filter(Boolean);
@@ -211,6 +247,7 @@ function writeTextFiles(newItems, fileFunc) {
     i.url,
     i.postDate,
     i.scanDate,
+    i.desc,
     i.tag,
     ""
   ]);
@@ -229,16 +266,16 @@ function writeExcel(newItems, filePath) {
     if (!fs.existsSync(file)) return [];
     const wb = XLSX.readFile(file);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, ""]); // Add empty tag for old rows
+    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, "", ""]); // Add empty desc and tag for old rows
   };
 
   const rows = [
-    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.tag]),
+    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.tag]),
     ...loadRows(filePath)
   ];
 
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תגית"],
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "תגית"],
     ...rows
   ];
 
@@ -273,6 +310,7 @@ function archiveRun(items, archiveDir) {
     i.url,
     i.postDate,
     i.scanDate,
+    i.desc,
     i.tag,
     ""
   ]);
@@ -284,8 +322,8 @@ function archiveRun(items, archiveDir) {
   // Excel
   const excelPath = path.join(archiveDir, `scan-${stamp}.xlsx`);
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תגית"],
-    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.tag])
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "תגית"],
+    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.tag])
   ];
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!rtl"] = true;

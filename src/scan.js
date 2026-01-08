@@ -194,6 +194,10 @@ async function scanSite(site) {
           const descEl = el.querySelector("div.elementor-post__excerpt p");
           desc = descEl ? descEl.textContent.trim() : "";
         } else if (siteType === "rotter") {
+          const bgcolor = el.getAttribute("bgcolor");
+          if (bgcolor !== "#FCF8F2") {
+            return; // skip header and pinned posts
+          }
           titleEl = el.querySelector("b");
           if (!titleEl) {
             console.log("No b in row");
@@ -206,7 +210,7 @@ async function scanSite(site) {
           }
           url = link.href;
           const dateFont = el.querySelector("td font[size='1']");
-          postDate = dateFont ? dateFont.textContent.split('<')[0].trim() : "";
+          postDate = dateFont ? dateFont.textContent.trim().split(' ')[0] : "";
           desc = "";
         }
 

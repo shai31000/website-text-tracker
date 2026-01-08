@@ -139,6 +139,12 @@ async function scanSite(site) {
       timeout: 60000
     });
 
+    // Wait for potential dynamic content
+    if (site.type === "yosmusic") {
+      await page.waitForSelector(".elementor-post__card", { timeout: 15000 });
+    }
+    await page.waitForTimeout(5000);
+
     const results = await page.evaluate((siteType) => {
       let elements;
       if (siteType === "forum") {

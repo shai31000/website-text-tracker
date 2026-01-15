@@ -28,6 +28,7 @@ async function scanSite(site) {
     }
     await page.waitForTimeout(5000);
 
+    console.log("Starting evaluate for siteType:", site.type);
     const results = await page.evaluate((siteType) => {
       let elements;
       if (siteType === "forum") {

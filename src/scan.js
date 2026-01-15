@@ -63,18 +63,8 @@ function loadBlacklist(filePath) {
 // =======================
 
 function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\// =======================
-// ניקוי טקסט
-// =======================
+  return string.replace(/[.*+?^{}()|[\]\\]/g, '\\&');
 
-function cleanText(text, blacklist) {
-  let result = text;
-  blacklist.forEach(word => {
-    result = result.replace(new RegExp(word, "gi"), "");
-  });
-  return result.replace(/\s+/g, " ").trim();
-}');
-}
 
 function cleanText(text, blacklist) {
   let result = text;

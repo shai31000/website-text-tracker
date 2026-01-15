@@ -63,25 +63,17 @@ function loadBlacklist(filePath) {
 // =======================
 
 function escapeRegExp(string) {
-  return string.replace(/[.*+?^{}()|[\]\\]/g, '\\&');
-
-
-function cleanText(text, blacklist) {
-  let result = text;
-  blacklist.forEach(word => {
-    const escaped = escapeRegExp(word.trim());
-    result = result.replace(new RegExp(escaped, "gi"), "");
-  });
-  return result.replace(/\s+/g, " ").trim();
+return string.replace(/[.*+?^{}()|[\]\\]/g, '\\&');
 }
 
-// =======================
-// ✅ תיקון: המרת תאריך עברי לפורמט אחיד
-// =======================
-
-function normalizeDate(raw) {
-  if (!raw) return "";
-
+function cleanText(text, blacklist) {
+let result = text;
+blacklist.forEach(word => {
+const escaped = escapeRegExp(word.trim());
+result = result.replace(new RegExp(escaped, "gi"), "");
+});
+return result.replace(/\s+/g, " ").trim();
+}
   // מפת חודשים בעברית
   const months = {
     "ינואר": "01",

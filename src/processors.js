@@ -1,0 +1,27 @@
+const { cleanText, normalizeDate } = require("./utils");
+
+// =======================
+// 2️⃣ עיבוד
+// =======================
+
+function processItems(items, blacklist, existingTitles) {
+  const scanDate = new Date().toISOString().slice(0, 10);
+
+  return items
+    .map(item => {
+      const cleanTitle = cleanText(item.title, blacklist);
+      if (!cleanTitle) return null;
+      if (existingTitles.includes(cleanTitle)) return null;
+
+      return {
+        title: cleanTitle,
+        url: item.url,
+        postDate: normalizeDate(item.postDate),
+        scanDate,
+        desc: item.desc || ""
+      };
+    })
+    .filter(Boolean);
+}
+
+module.exports = { processItems };

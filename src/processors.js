@@ -11,7 +11,7 @@ function processItems(items, blacklist, existingTitles) {
     .map(item => {
       const cleanTitle = cleanText(item.title, blacklist);
       if (!cleanTitle) return null;
-      // if (existingTitles.includes(cleanTitle)) return null; // temporarily disabled
+      if (existingTitles.includes(cleanTitle)) return null;
 
       return {
         title: cleanTitle,

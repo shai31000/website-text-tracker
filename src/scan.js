@@ -26,7 +26,7 @@ const GLOBAL_DIR = path.join(BASE_DATA, "global");
 const ARCHIVE_GLOBAL_DIR = path.join(BASE_DATA, "archive", "global");
 
 // יצירת תיקיות גלובליות אם לא קיימות
-[GLOBAL_DIR, ARCHIVE_GLOBAL_DIR].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
+[GLOBAL_DIR, ARCHIVE_GLOBAL_DIR, path.join(BASE_DATA, "blacklists")].forEach(dir => fs.mkdirSync(dir, { recursive: true }));
 
 // =======================
 // קבצים קבועים
@@ -380,7 +380,7 @@ async function scanAndProcess(site, globalBlacklist, existingTitles) {
 
   const siteFile = name => path.join(siteDir, name);
 
-  const siteBlacklist = loadBlacklist(siteFile(FILES.blacklist));
+  const siteBlacklist = loadBlacklist(path.join(BASE_DATA, "blacklists", site.id + ".txt"));
   const scanned = await scanSite(site);
   const newItems = processItems(scanned, [...globalBlacklist, ...siteBlacklist], existingTitles);
   newItems.forEach(item => item.tag = site.tag);

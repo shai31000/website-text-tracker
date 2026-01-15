@@ -23,6 +23,8 @@ async function scanSite(site) {
       await page.waitForSelector(".elementor-post__card", { timeout: 15000 });
     } else if (site.type === "youtube-playlist") {
       await page.waitForSelector("ytd-playlist-video-renderer", { timeout: 15000 });
+    } else if (site.type === "apple-music-playlist") {
+      await page.waitForSelector(".songs-list-row", { timeout: 15000 });
     }
     await page.waitForTimeout(5000);
 
@@ -36,6 +38,8 @@ async function scanSite(site) {
         elements = document.querySelectorAll("tr");
       } else if (siteType === "youtube-playlist") {
         elements = document.querySelectorAll("ytd-playlist-video-renderer");
+      } else if (siteType === "apple-music-playlist") {
+        elements = document.querySelectorAll(".songs-list-row");
       } else {
         return [];
       }
@@ -116,6 +120,25 @@ async function scanSite(site) {
 
             desc = publishTime;
             postDate = publishTime;
+          } else if (siteType === "apple-music-playlist") {
+            const songLink = el.querySelector("a[href*='/song/']");
+            if (!songLink) {
+              console.log("No song link in row");
+              return;
+            }
+            title = songLink.textContent.trim();
+            url = songLink.href;
+
+            const artistLink = el.querySelector("a[href*='/artist/']");
+            channel = artistLink ? artistLink.textContent.trim() : "";
+
+            const albumLink = el.querySelector("a[href*='/album/']");
+            desc = albumLink ? albumLink.textContent.trim() : "";
+
+            const durationEl = el.querySelector("time[data-testid='track-duration']");
+            duration = durationEl ? durationEl.textContent.trim() : "";
+
+            postDate = "";
           }
 
           console.log("Found title:", title);

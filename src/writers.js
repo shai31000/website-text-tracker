@@ -38,6 +38,8 @@ function writeTextFiles(newItems, fileFunc) {
     i.postDate,
     i.scanDate,
     i.desc,
+    i.duration,
+    i.channel,
     i.tag,
     ""
   ]);
@@ -56,16 +58,16 @@ function writeExcel(newItems, filePath) {
     if (!fs.existsSync(file)) return [];
     const wb = XLSX.readFile(file);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, "", ""]); // Add empty desc and tag for old rows
+    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, "", "", ""]); // Add empty desc, duration, channel, tag for old rows
   };
 
   const rows = [
-    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.tag]),
+    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag]),
     ...loadRows(filePath)
   ];
 
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "תגית"],
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית"],
     ...rows
   ];
 
@@ -101,6 +103,8 @@ function archiveRun(items, archiveDir) {
     i.postDate,
     i.scanDate,
     i.desc,
+    i.duration,
+    i.channel,
     i.tag,
     ""
   ]);
@@ -112,8 +116,8 @@ function archiveRun(items, archiveDir) {
   // Excel
   const excelPath = path.join(archiveDir, `scan-${stamp}.xlsx`);
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "תגית"],
-    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.tag])
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית"],
+    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag])
   ];
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!rtl"] = true;

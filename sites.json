@@ -33,5 +33,12 @@
     "url": "https://rotter.name/cgi-bin/nor/dcboard.cgi?az=list&forum=music",
     "tag": "אלבומים חדשים",
     "type": "rotter"
+  },
+  {
+    "id": "youtube-playlist",
+    "name": "פלייליסט יוטיוב מוזיקה לועזית",
+    "url": "https://www.youtube.com/playlist?list=PLB20B645E492D37CE",
+    "tag": "מוזיקה לועזית חדשה",
+    "type": "youtube-playlist"
   }
 ]

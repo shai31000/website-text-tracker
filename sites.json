@@ -40,5 +40,12 @@
     "url": "https://www.youtube.com/playlist?list=PLB20B645E492D37CE",
     "tag": "מוזיקה לועזית חדשה",
     "type": "youtube-playlist"
+  },
+  {
+    "id": "apple-music-playlist",
+    "name": "פלייליסט אפל מיוזיק מוזיקה לועזית",
+    "url": "https://music.apple.com/us/playlist/new-music-daily/pl.2b0e6e332fdf4b7a91164da3162127b5",
+    "tag": "מוזיקה לועזית חדשה",
+    "type": "apple-music-playlist"
   }
 ]

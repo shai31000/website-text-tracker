@@ -28,12 +28,12 @@ function writeTextFiles(newItems, fileFunc) {
   if (!newItems.length) return;
 
   // titles.txt
-  const titles = newItems.map(i => i.title);
+  const titles = newItems.map(i => i.channel ? i.title + " - " + i.channel : i.title);
   prependLines(fileFunc(FILES.titles), titles);
 
   // fulldata.txt
   const fulldataLines = newItems.flatMap(i => [
-    i.title,
+    i.channel ? i.title + " - " + i.channel : i.title,
     i.url,
     i.postDate,
     i.scanDate,
@@ -58,16 +58,16 @@ function writeExcel(newItems, filePath) {
     if (!fs.existsSync(file)) return [];
     const wb = XLSX.readFile(file);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, "", "", ""]); // Add empty desc, duration, channel, tag for old rows
+    return XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(1).map(row => [...row, "", "", "", ""]); // Add empty desc, duration, channel, tag, artistUrl, albumUrl, song-artist for old rows
   };
 
   const rows = [
-    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag]),
+    ...newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag, i.artistUrl, i.albumUrl, i.channel ? i.title + " - " + i.channel : i.title]),
     ...loadRows(filePath)
   ];
 
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית"],
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
     ...rows
   ];
 
@@ -98,7 +98,7 @@ function archiveRun(items, archiveDir) {
 
   // Metadata text
   const baseLines = items.flatMap(i => [
-    i.title,
+    i.channel ? i.title + " - " + i.channel : i.title,
     i.url,
     i.postDate,
     i.scanDate,
@@ -116,8 +116,8 @@ function archiveRun(items, archiveDir) {
   // Excel
   const excelPath = path.join(archiveDir, `scan-${stamp}.xlsx`);
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית"],
-    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag])
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
+    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag, i.artistUrl, i.albumUrl, i.channel ? i.title + " - " + i.channel : i.title])
   ];
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!rtl"] = true;

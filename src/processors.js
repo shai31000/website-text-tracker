@@ -18,7 +18,9 @@ function processItems(items, blacklist, existingTitles) {
         url: item.url,
         postDate: normalizeDate(item.postDate),
         scanDate,
-        desc: item.desc || ""
+        desc: item.desc || "",
+        duration: item.duration || "",
+        channel: item.channel || ""
       };
     })
     .filter(Boolean);

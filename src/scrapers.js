@@ -21,6 +21,8 @@ async function scanSite(site) {
     // Wait for potential dynamic content
     if (site.type === "yosmusic") {
       await page.waitForSelector(".elementor-post__card", { timeout: 15000 });
+    } else if (site.type === "youtube-playlist") {
+      await page.waitForSelector("ytd-playlist-video-renderer", { timeout: 15000 });
     }
     await page.waitForTimeout(5000);
 
@@ -90,19 +92,24 @@ async function scanSite(site) {
             console.log("No video title in playlist item");
             return;
           }
-          title = titleLink.textContent.trim();
+          const titleText = titleLink.textContent;
+          if (!titleText) {
+            console.log("No titleText");
+            return;
+          }
+          title = titleText.trim();
           const fullUrl = titleLink.href;
-          url = fullUrl.split('&')[0]; // keep only /watch?v=...
+          url = fullUrl ? fullUrl.split('&')[0] : ""; // keep only /watch?v=...
 
           const durationBadge = el.querySelector(".yt-badge-shape__text");
-          const duration = durationBadge ? durationBadge.textContent.trim() : "";
+          const duration = durationBadge && durationBadge.textContent ? durationBadge.textContent.trim() : "";
 
           const channelLink = el.querySelector("#text-container a");
-          const channelName = channelLink ? channelLink.textContent.trim() : "";
+          const channelName = channelLink && channelLink.textContent ? channelLink.textContent.trim() : "";
           const channelUrl = channelLink ? channelLink.href : "";
 
           const metaBlock = el.querySelector("yt-formatted-string#video-info");
-          const publishTime = metaBlock ? metaBlock.textContent.trim().split(' • ')[1] : ""; // after the views
+          const publishTime = metaBlock && metaBlock.textContent ? metaBlock.textContent.trim().split(' • ')[1] : "";
 
           desc = `${channelName} - ${duration} - ${publishTime}`;
           postDate = publishTime;

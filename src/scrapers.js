@@ -46,7 +46,7 @@ async function scanSite(site) {
       elements.forEach(el => {
         try {
           console.log("Processing element:", el.textContent.substring(0, 100));
-          let titleEl, url, postDate = "", desc = "";
+          let titleEl, url, postDate = "", desc = "", duration = "", channel = "";
 
           if (siteType === "forum") {
             titleEl = el.querySelector("a.topictitle");
@@ -106,16 +106,15 @@ async function scanSite(site) {
             url = fullUrl ? fullUrl.split('&')[0] : ""; // keep only /watch?v=...
 
             const durationBadge = el.querySelector(".yt-badge-shape__text");
-            const duration = durationBadge && durationBadge.textContent ? durationBadge.textContent.trim() : "";
+            duration = durationBadge && durationBadge.textContent ? durationBadge.textContent.trim() : "";
 
             const channelLink = el.querySelector("#text-container a");
-            const channelName = channelLink && channelLink.textContent ? channelLink.textContent.trim() : "";
-            const channelUrl = channelLink ? channelLink.href : "";
+            channel = channelLink && channelLink.textContent ? channelLink.textContent.trim() : "";
 
             const metaBlock = el.querySelector("yt-formatted-string#video-info");
             const publishTime = metaBlock && metaBlock.textContent ? metaBlock.textContent.trim().split(' • ')[1] : "";
 
-            desc = `${channelName} - ${duration} - ${publishTime}`;
+            desc = publishTime;
             postDate = publishTime;
           }
 
@@ -125,7 +124,9 @@ async function scanSite(site) {
             title,
             url,
             postDate,
-            desc
+            desc,
+            duration,
+            channel
           });
         } catch (e) {
           console.log("Error processing element:", e.message);

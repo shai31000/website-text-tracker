@@ -32,6 +32,8 @@ async function scanSite(site) {
         elements = document.querySelectorAll(".elementor-post__card");
       } else if (siteType === "rotter") {
         elements = document.querySelectorAll("tr");
+      } else if (siteType === "youtube-playlist") {
+        elements = document.querySelectorAll("ytd-playlist-video-renderer");
       } else {
         return [];
       }
@@ -82,6 +84,28 @@ async function scanSite(site) {
           const dateFont = el.querySelector("td font[size='1']");
           postDate = dateFont ? dateFont.textContent.trim().split(' ')[0] : "";
           desc = "";
+        } else if (siteType === "youtube-playlist") {
+          const titleLink = el.querySelector("a#video-title");
+          if (!titleLink) {
+            console.log("No video title in playlist item");
+            return;
+          }
+          title = titleLink.textContent.trim();
+          const fullUrl = titleLink.href;
+          url = fullUrl.split('&')[0]; // keep only /watch?v=...
+
+          const durationBadge = el.querySelector(".yt-badge-shape__text");
+          const duration = durationBadge ? durationBadge.textContent.trim() : "";
+
+          const channelLink = el.querySelector("#text-container a");
+          const channelName = channelLink ? channelLink.textContent.trim() : "";
+          const channelUrl = channelLink ? channelLink.href : "";
+
+          const metaBlock = el.querySelector("yt-formatted-string#video-info");
+          const publishTime = metaBlock ? metaBlock.textContent.trim().split(' • ')[1] : ""; // after the views
+
+          desc = `${channelName} - ${duration} - ${publishTime}`;
+          postDate = publishTime;
         }
 
         console.log("Found title:", titleEl.textContent.trim());

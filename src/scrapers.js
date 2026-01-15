@@ -50,7 +50,7 @@ async function scanSite(site) {
       elements.forEach(el => {
         try {
           console.log("Processing element:", el.textContent.substring(0, 100));
-          let titleEl, url, postDate = "", desc = "", duration = "", channel = "";
+          let titleEl, url, postDate = "", desc = "", duration = "", channel = "", artistUrl = "", albumUrl = "";
 
           if (siteType === "forum") {
             titleEl = el.querySelector("a.topictitle");
@@ -131,9 +131,11 @@ async function scanSite(site) {
 
             const artistLink = el.querySelector("a[href*='/artist/']");
             channel = artistLink ? artistLink.textContent.trim() : "";
+            artistUrl = artistLink ? artistLink.href : "";
 
             const albumLink = el.querySelector("a[href*='/album/']");
             desc = albumLink ? albumLink.textContent.trim() : "";
+            albumUrl = albumLink ? albumLink.href : "";
 
             const durationEl = el.querySelector("time[data-testid='track-duration']");
             duration = durationEl ? durationEl.textContent.trim() : "";
@@ -149,7 +151,9 @@ async function scanSite(site) {
             postDate,
             desc,
             duration,
-            channel
+            channel,
+            artistUrl,
+            albumUrl
           });
         } catch (e) {
           console.log("Error processing element:", e.message);

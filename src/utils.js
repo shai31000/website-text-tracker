@@ -17,10 +17,24 @@ function loadBlacklist(filePath) {
 // ניקוי טקסט
 // =======================
 
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\// =======================
+// ניקוי טקסט
+// =======================
+
 function cleanText(text, blacklist) {
   let result = text;
   blacklist.forEach(word => {
     result = result.replace(new RegExp(word, "gi"), "");
+  });
+  return result.replace(/\s+/g, " ").trim();
+}');
+}
+
+function cleanText(text, blacklist) {
+  let result = text;
+  blacklist.forEach(word => {
+    result = result.replace(new RegExp(escapeRegExp(word), "gi"), "");
   });
   return result.replace(/\s+/g, " ").trim();
 }
@@ -85,4 +99,4 @@ function normalizeDate(raw) {
   return raw;
 }
 
-module.exports = { loadBlacklist, cleanText, normalizeDate };
+module.exports = { loadBlacklist, cleanText, normalizeDate, escapeRegExp };

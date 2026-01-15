@@ -20,7 +20,9 @@ function processItems(items, blacklist, existingTitles) {
         scanDate,
         desc: item.desc || "",
         duration: item.duration || "",
-        channel: item.channel || ""
+        channel: item.channel || "",
+        artistUrl: item.artistUrl || "",
+        albumUrl: item.albumUrl || ""
       };
     })
     .filter(Boolean);

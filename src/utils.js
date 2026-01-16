@@ -52,7 +52,7 @@ function normalizeDate(raw) {
     "דצמבר": "12"
   };
 
-  const clean = raw.replace(",", "").trim();
+  const clean = raw.replace(",", "").replace(/ \| מאת/g, "").trim();
 
   let datePart = clean;
   let timePart = "";
@@ -60,7 +60,7 @@ function normalizeDate(raw) {
   if (clean.includes(" ")) {
     const spaceIndex = clean.indexOf(" ");
     datePart = clean.substring(0, spaceIndex);
-    timePart = clean.substring(spaceIndex + 1).split(" ")[0]; // take first part after space
+    timePart = clean.substring(spaceIndex + 1).trim().split(" ")[0]; // take first part after space
   }
 
   let normalized = datePart;

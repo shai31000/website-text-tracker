@@ -94,6 +94,7 @@ async function scanSite(site) {
             url = link.href;
             const dateFont = el.querySelector("td font[size='1']");
             let rawDate = dateFont ? dateFont.textContent.trim() : "";
+            console.log("Raw date for Rotter:", rawDate);
             // Parse Rotter date format: "year  time-month-day | מאת" -> "year-day-month | time"
             let parsedDate = rawDate;
             if (parsedDate.includes(" | מאת")) {

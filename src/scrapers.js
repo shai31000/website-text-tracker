@@ -93,7 +93,27 @@ async function scanSite(site) {
             }
             url = link.href;
             const dateFont = el.querySelector("td font[size='1']");
-            postDate = dateFont ? dateFont.textContent.trim() : "";
+            let rawDate = dateFont ? dateFont.textContent.trim() : "";
+            // Parse Rotter date format: "year  time-month-day | מאת" -> "year-day-month | time"
+            let parsedDate = rawDate;
+            if (parsedDate.includes(" | מאת")) {
+              parsedDate = parsedDate.replace(" | מאת", "");
+            }
+            if (parsedDate.includes(" ")) {
+              const spaceIndex = parsedDate.indexOf(" ");
+              const year = parsedDate.substring(0, spaceIndex);
+              const timeDate = parsedDate.substring(spaceIndex + 1).trim();
+              if (timeDate.includes("-")) {
+                const parts = timeDate.split("-");
+                if (parts.length >= 3) {
+                  const time = parts[0];
+                  const month = parts[1].padStart(2, "0");
+                  const day = parts[2].padStart(2, "0");
+                  parsedDate = `${year}-${day}-${month} | ${time}`;
+                }
+              }
+            }
+            postDate = parsedDate;
             desc = "";
           } else if (siteType === "youtube-playlist") {
             const titleLink = el.querySelector("a#video-title");

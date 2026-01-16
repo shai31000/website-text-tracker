@@ -65,6 +65,18 @@ function normalizeDate(raw) {
 
   let normalized = datePart;
 
+  // Special handling for time-date format (e.g., Rotter: "02:14-12-31")
+  if (timePart && timePart.includes("-")) {
+    const parts = timePart.split("-");
+    if (parts.length >= 3) {
+      const time = parts[0]; // "02:14"
+      const month = parts[1].padStart(2, "0"); // "12"
+      const day = parts[2].padStart(2, "0"); // "31"
+      normalized = `${datePart}-${day}-${month}`;
+      return `${normalized} | ${time}`;
+    }
+  }
+
   if (datePart.includes("/")) {
     // דוגמה: "17/08/2025"
     const parts = datePart.split("/");

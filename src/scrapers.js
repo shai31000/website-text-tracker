@@ -93,7 +93,7 @@ async function scanSite(site) {
             }
             url = link.href;
             const dateFont = el.querySelector("td font[size='1']");
-            postDate = dateFont ? dateFont.textContent.trim().split(' ')[0] : "";
+            postDate = dateFont ? dateFont.textContent.trim() : "";
             desc = "";
           } else if (siteType === "youtube-playlist") {
             const titleLink = el.querySelector("a#video-title");

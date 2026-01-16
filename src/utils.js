@@ -54,39 +54,54 @@ function normalizeDate(raw) {
 
   const clean = raw.replace(",", "").trim();
 
-  if (clean.includes("/")) {
+  let datePart = clean;
+  let timePart = "";
+
+  if (clean.includes(" ")) {
+    const spaceIndex = clean.indexOf(" ");
+    datePart = clean.substring(0, spaceIndex);
+    timePart = clean.substring(spaceIndex + 1).split(" ")[0]; // take first part after space
+  }
+
+  let normalized = datePart;
+
+  if (datePart.includes("/")) {
     // דוגמה: "17/08/2025"
-    const parts = clean.split("/");
+    const parts = datePart.split("/");
     if (parts.length === 3) {
       const day = parts[0].padStart(2, "0");
       const month = parts[1].padStart(2, "0");
       const year = parts[2];
-      return `${year}-${month}-${day}`;
+      normalized = `${year}-${month}-${day}`;
     }
-  } else if (clean.includes(".")) {
+  } else if (datePart.includes(".")) {
     // דוגמה: "31.12.25"
-    const parts = clean.split(".");
+    const parts = datePart.split(".");
     if (parts.length === 3) {
       const day = parts[0].padStart(2, "0");
       const month = parts[1].padStart(2, "0");
       const year = "20" + parts[2];
-      return `${year}-${month}-${day}`;
+      normalized = `${year}-${month}-${day}`;
     }
   } else {
-    // דוגמה: "03 ינואר 2026, 19:53"
-    const parts = clean.split(/\s+/);
+    // דוגמה: "03 ינואר 2026"
+    const parts = datePart.split(/\s+/);
     if (parts.length >= 3) {
       const day = parts[0].padStart(2, "0");
       const monthName = parts[1];
       const year = parts[2];
       const month = months[monthName];
       if (month) {
-        return `${year}-${month}-${day}`;
+        normalized = `${year}-${month}-${day}`;
       }
     }
   }
 
-  return raw;
+  if (timePart) {
+    return `${normalized} | ${timePart}`;
+  } else {
+    return normalized;
+  }
 }
 
 module.exports = { loadBlacklist, cleanText, normalizeDate, escapeRegExp };

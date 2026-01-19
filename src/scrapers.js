@@ -29,7 +29,7 @@ async function scanSite(site) {
     await page.waitForTimeout(5000);
 
     console.log("Starting evaluate for siteType:", site.type);
-    const results = await page.evaluate((siteType) => {
+    const data = await page.evaluate((siteType) => {
       let elements;
       if (siteType === "forum") {
         elements = document.querySelectorAll("tr");
@@ -47,6 +47,7 @@ async function scanSite(site) {
 
       console.log("Found elements:", elements.length);
       const results = [];
+      const rawDates = [];
 
       elements.forEach(el => {
         try {
@@ -95,26 +96,8 @@ async function scanSite(site) {
             const dateFont = el.querySelector("td font[size='1']");
             let rawDate = dateFont ? dateFont.textContent.trim() : "";
             console.log("Raw date for Rotter:", rawDate);
-            // Parse Rotter date format: "year  time-month-day | מאת" -> "year-day-month | time"
-            let parsedDate = rawDate;
-            if (parsedDate.includes(" | מאת")) {
-              parsedDate = parsedDate.replace(" | מאת", "");
-            }
-            if (parsedDate.includes(" ")) {
-              const spaceIndex = parsedDate.indexOf(" ");
-              const year = parsedDate.substring(0, spaceIndex);
-              const timeDate = parsedDate.substring(spaceIndex + 1).trim();
-              if (timeDate.includes("-")) {
-                const parts = timeDate.split("-");
-                if (parts.length >= 3) {
-                  const time = parts[0];
-                  const month = parts[1].padStart(2, "0");
-                  const day = parts[2].padStart(2, "0");
-                  parsedDate = `${year}-${day}-${month} | ${time}`;
-                }
-              }
-            }
-            postDate = parsedDate;
+            rawDates.push(rawDate);
+            postDate = rawDate;
             desc = "";
           } else if (siteType === "youtube-playlist") {
             const titleLink = el.querySelector("a#video-title");
@@ -183,10 +166,11 @@ async function scanSite(site) {
       });
 
       console.log("Total results:", results.length);
-      return results;
+      return { results, debug: { rawDates } };
     }, site.type);
 
-    return results;
+    console.log("Debug for", site.type, data.debug);
+    return data.results;
   } finally {
     await browser.close();
   }

@@ -52,68 +52,52 @@ function normalizeDate(raw) {
     "דצמבר": "12"
   };
 
-  const clean = raw.replace(",", "").replace(/\s*\|\s*מאת\s*/g, "").trim();
+  const clean = raw.replace(",", "").trim();
 
-  let datePart = clean;
-  let timePart = "";
-
-  if (clean.includes(" ")) {
-    const spaceIndex = clean.indexOf(" ");
-    datePart = clean.substring(0, spaceIndex);
-    timePart = clean.substring(spaceIndex + 1).trim().split(" ")[0]; // take first part after space
+  // Check for Rotter-specific date format: "2026  11:48-01-17 | מאת"
+  const rotterDateRegex = /^(\d{4})\s+(\d{2}:\d{2})-(\d{2})-(\d{2})\s*\|\s*מאת$/;
+  const rotterMatch = clean.match(rotterDateRegex);
+  if (rotterMatch) {
+    const year = rotterMatch[1];
+    const time = rotterMatch[2];
+    const day = rotterMatch[3];
+    const month = rotterMatch[4];
+    return `${year}-${month}-${day} | ${time}`;
   }
 
-  let normalized = datePart;
-
-  // Special handling for time-date format (e.g., Rotter: "02:14-12-31")
-  if (timePart && timePart.includes("-")) {
-    const parts = timePart.split("-");
-    if (parts.length >= 3) {
-      const time = parts[0]; // "02:14"
-      const month = parts[1].padStart(2, "0"); // "12"
-      const day = parts[2].padStart(2, "0"); // "31"
-      normalized = `${datePart}-${day}-${month}`;
-      return `${normalized} | ${time}`;
-    }
-  }
-
-  if (datePart.includes("/")) {
+  if (clean.includes("/")) {
     // דוגמה: "17/08/2025"
-    const parts = datePart.split("/");
+    const parts = clean.split("/");
     if (parts.length === 3) {
       const day = parts[0].padStart(2, "0");
       const month = parts[1].padStart(2, "0");
       const year = parts[2];
-      normalized = `${year}-${month}-${day}`;
+      return `${year}-${month}-${day}`;
     }
-  } else if (datePart.includes(".")) {
+  } else if (clean.includes(".")) {
     // דוגמה: "31.12.25"
-    const parts = datePart.split(".");
+    const parts = clean.split(".");
     if (parts.length === 3) {
       const day = parts[0].padStart(2, "0");
       const month = parts[1].padStart(2, "0");
       const year = "20" + parts[2];
-      normalized = `${year}-${month}-${day}`;
+      return `${year}-${month}-${day}`;
     }
   } else {
-    // דוגמה: "03 ינואר 2026"
-    const parts = datePart.split(/\s+/);
+    // דוגמה: "03 ינואר 2026, 19:53"
+    const parts = clean.split(/\s+/);
     if (parts.length >= 3) {
       const day = parts[0].padStart(2, "0");
       const monthName = parts[1];
       const year = parts[2];
       const month = months[monthName];
       if (month) {
-        normalized = `${year}-${month}-${day}`;
+        return `${year}-${month}-${day}`;
       }
     }
   }
 
-  if (timePart) {
-    return `${normalized} | ${timePart}`;
-  } else {
-    return normalized;
-  }
+  return raw;
 }
 
 module.exports = { loadBlacklist, cleanText, normalizeDate, escapeRegExp };

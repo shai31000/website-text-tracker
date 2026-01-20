@@ -54,17 +54,6 @@ function normalizeDate(raw) {
 
   const clean = raw.replace(",", "").trim();
 
-  // Check for Rotter-specific date format: "2026  11:48-01-17 | מאת"
-  const rotterDateRegex = /^(\d{4})\s+(\d{2}:\d{2})-(\d{2})-(\d{2})\s*\|\s*מאת$/;
-  const rotterMatch = clean.match(rotterDateRegex);
-  if (rotterMatch) {
-    const year = rotterMatch[1];
-    const time = rotterMatch[2];
-    const day = rotterMatch[3];
-    const month = rotterMatch[4];
-    return `${year}-${month}-${day} | ${time}`;
-  }
-
   if (clean.includes("/")) {
     // דוגמה: "17/08/2025"
     const parts = clean.split("/");

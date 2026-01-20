@@ -29,7 +29,7 @@ async function scanSite(site) {
     await page.waitForTimeout(5000);
 
     console.log("Starting evaluate for siteType:", site.type);
-    const data = await page.evaluate((siteType) => {
+    const results = await page.evaluate((siteType) => {
       let elements;
       if (siteType === "forum") {
         elements = document.querySelectorAll("tr");
@@ -47,7 +47,6 @@ async function scanSite(site) {
 
       console.log("Found elements:", elements.length);
       const results = [];
-      const rawDates = [];
 
       elements.forEach(el => {
         try {
@@ -94,10 +93,7 @@ async function scanSite(site) {
             }
             url = link.href;
             const dateFont = el.querySelector("td font[size='1']");
-            let rawDate = dateFont ? dateFont.textContent.trim() : "";
-            console.log("Raw date for Rotter:", rawDate);
-            rawDates.push(rawDate);
-            postDate = rawDate;
+            postDate = dateFont ? dateFont.textContent.trim().split(' ')[0] : "";
             desc = "";
           } else if (siteType === "youtube-playlist") {
             const titleLink = el.querySelector("a#video-title");
@@ -166,11 +162,10 @@ async function scanSite(site) {
       });
 
       console.log("Total results:", results.length);
-      return { results, debug: { rawDates } };
+      return results;
     }, site.type);
 
-    console.log("Debug for", site.type, data.debug);
-    return data.results;
+    return results;
   } finally {
     await browser.close();
   }

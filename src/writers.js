@@ -55,8 +55,8 @@ function writeTextFiles(newItems, fileFunc) {
     i.channel ? i.title + " - " + i.channel : i.title,
     i.url,
     i.postDate,
+    i.desc, // time is now in desc
     i.scanDate,
-    i.desc,
     i.duration,
     i.channel,
     i.tag,
@@ -81,8 +81,8 @@ function writeTextFilesWeekly(newItems, baseDir) {
     i.channel ? i.title + " - " + i.channel : i.title,
     i.url,
     i.postDate,
+    i.desc, // time is now in desc
     i.scanDate,
-    i.desc,
     i.duration,
     i.channel,
     i.tag,
@@ -102,8 +102,13 @@ function writeExcel(newItems, filePath) {
   const rows = newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag, i.artistUrl, i.albumUrl, i.channel ? i.title + " - " + i.channel : i.title]);
 
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
-    ...rows
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "שעה", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
+    ...rows.map(row => {
+      const time = row[4]; // desc contains the time
+      row[4] = ""; // Clear the desc field
+      row.splice(5, 0, time); // Insert time after scanDate
+      return row;
+    })
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -124,8 +129,13 @@ function writeExcelWeekly(newItems, baseDir) {
   const rows = newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag, i.artistUrl, i.albumUrl, i.channel ? i.title + " - " + i.channel : i.title]);
 
   const data = [
-    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
-    ...rows
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "שעה", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
+    ...rows.map(row => {
+      const time = row[4]; // desc contains the time
+      row[4] = ""; // Clear the desc field
+      row.splice(5, 0, time); // Insert time after scanDate
+      return row;
+    })
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);

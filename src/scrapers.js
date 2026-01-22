@@ -109,8 +109,12 @@ async function scanSite(site) {
             }
             url = link.href;
             const dateFont = el.querySelector("td font[size='1']");
-            postDate = dateFont ? dateFont.textContent.trim().split(' ')[0] : "";
-            desc = "";
+            const dateText = dateFont ? dateFont.textContent.trim() : "";
+            const dateParts = dateText.split(/\s+/);
+            const time = dateParts.length > 1 ? dateParts[1] : "";
+            const date = dateParts.length > 0 ? dateParts[0] : "";
+            postDate = date;
+            desc = time;
           } else if (siteType === "youtube-playlist") {
             const titleLink = el.querySelector("a#video-title");
             if (!titleLink) {

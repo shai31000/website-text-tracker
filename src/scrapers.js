@@ -45,6 +45,22 @@ async function scanSite(site) {
         return [];
       }
 
+      // Deduplicate elements for Apple Music playlists
+      if (siteType === "apple-music-playlist") {
+        const seenUrls = new Set();
+        elements = Array.from(elements).filter(el => {
+          const songLink = el.querySelector("a[href*='/song/']");
+          if (songLink && songLink.href) {
+            if (seenUrls.has(songLink.href)) {
+              return false; // Skip duplicates
+            }
+            seenUrls.add(songLink.href);
+            return true;
+          }
+          return false;
+        });
+      }
+
       console.log("Found elements:", elements.length);
       const results = [];
 

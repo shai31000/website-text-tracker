@@ -49,7 +49,7 @@ async function scanSite(site) {
       if (siteType === "apple-music-playlist") {
         const seenUrls = new Set();
         elements = Array.from(elements).filter(el => {
-          const songLink = el.querySelector("a[href*='/song/']");
+          const songLink = el.querySelector("a[data-testid='click-action'][href*='/song/']");
           if (songLink && songLink.href) {
             if (seenUrls.has(songLink.href)) {
               return false; // Skip duplicates

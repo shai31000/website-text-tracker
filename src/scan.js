@@ -9,7 +9,7 @@ const path = require("path");
 const { loadBlacklist } = require("./utils");
 const { scanSite } = require("./scrapers");
 const { processItems } = require("./processors");
-const { FILES, writeTextFiles, writeExcel, archiveRun } = require("./writers");
+const { FILES, writeTextFiles, writeTextFilesWeekly, writeExcel, writeExcelWeekly, archiveRun, archiveRunWeekly } = require("./writers");
 
 // =======================
 // טעינת אתרים מהקונפיג

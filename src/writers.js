@@ -14,6 +14,25 @@ const FILES = {
 };
 
 // =======================
+// פונקציות עזר לתאריכים
+// =======================
+
+function getWeekFolder() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const week = String(Math.ceil(now.getDate() / 7)).padStart(2, "0");
+  return `${year}-${month}-week${week}`;
+}
+
+function getWeekPath(baseDir) {
+  const weekFolder = getWeekFolder();
+  const weekPath = path.join(baseDir, weekFolder);
+  fs.mkdirSync(weekPath, { recursive: true });
+  return weekPath;
+}
+
+// =======================
 // 3️⃣ כתיבה לקבצי טקסט
 // =======================
 
@@ -47,6 +66,32 @@ function writeTextFiles(newItems, fileFunc) {
   prependLines(fileFunc(FILES.fulldata), fulldataLines);
 }
 
+function writeTextFilesWeekly(newItems, baseDir) {
+  if (!newItems.length) return;
+
+  const weekPath = getWeekPath(baseDir);
+  const weekFileFunc = name => path.join(weekPath, name);
+
+  // titles.txt
+  const titles = newItems.map(i => i.channel ? i.title + " - " + i.channel : i.title);
+  prependLines(weekFileFunc(FILES.titles), titles);
+
+  // fulldata.txt
+  const fulldataLines = newItems.flatMap(i => [
+    i.channel ? i.title + " - " + i.channel : i.title,
+    i.url,
+    i.postDate,
+    i.scanDate,
+    i.desc,
+    i.duration,
+    i.channel,
+    i.tag,
+    ""
+  ]);
+
+  prependLines(weekFileFunc(FILES.fulldata), fulldataLines);
+}
+
 // =======================
 // 4️⃣ כתיבה ל-Excel
 // =======================
@@ -78,6 +123,28 @@ function writeExcel(newItems, filePath) {
   XLSX.utils.book_append_sheet(wb, ws, "Titles");
 
   XLSX.writeFile(wb, filePath);
+}
+
+function writeExcelWeekly(newItems, baseDir) {
+  if (!newItems.length) return;
+
+  const weekPath = getWeekPath(baseDir);
+  const weekFilePath = path.join(weekPath, FILES.excel);
+
+  const rows = newItems.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag, i.artistUrl, i.albumUrl, i.channel ? i.title + " - " + i.channel : i.title]);
+
+  const data = [
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
+    ...rows
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!rtl"] = true;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Titles");
+
+  XLSX.writeFile(wb, weekFilePath);
 }
 
 // =======================
@@ -126,4 +193,47 @@ function archiveRun(items, archiveDir) {
   XLSX.writeFile(wb, excelPath);
 }
 
-module.exports = { FILES, prependLines, writeTextFiles, writeExcel, archiveRun };
+function archiveRunWeekly(items, archiveDir) {
+  if (!items.length) return;
+
+  const weekPath = getWeekPath(archiveDir);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  // Plain text titles
+  const titles = items.map(i => i.title);
+  fs.writeFileSync(
+    path.join(weekPath, `scan-${stamp}-titles.txt`),
+    titles.join("\n")
+  );
+
+  // Metadata text
+  const baseLines = items.flatMap(i => [
+    i.channel ? i.title + " - " + i.channel : i.title,
+    i.url,
+    i.postDate,
+    i.scanDate,
+    i.desc,
+    i.duration,
+    i.channel,
+    i.tag,
+    ""
+  ]);
+  fs.writeFileSync(
+    path.join(weekPath, `scan-${stamp}-fulldata.txt`),
+    baseLines.join("\n")
+  );
+
+  // Excel
+  const excelPath = path.join(weekPath, `scan-${stamp}.xlsx`);
+  const data = [
+    ["כותרת", "תאריך פוסט", "קישור", "תאריך סריקה", "תיאור", "משך", "ערוץ", "תגית", "קישור אמן", "קישור אלבום", "שיר - אמן"],
+    ...items.map(i => [i.title, i.postDate, i.url, i.scanDate, i.desc, i.duration, i.channel, i.tag, i.artistUrl, i.albumUrl, i.channel ? i.title + " - " + i.channel : i.title])
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!rtl"] = true;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Titles");
+  XLSX.writeFile(wb, excelPath);
+}
+
+module.exports = { FILES, prependLines, writeTextFiles, writeTextFilesWeekly, writeExcel, writeExcelWeekly, archiveRun, archiveRunWeekly, getWeekPath };

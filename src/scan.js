@@ -54,8 +54,11 @@ async function scanAndProcess(site, globalBlacklist, existingTitles) {
 
   if (newItems.length) {
     writeTextFiles(newItems, siteFile);
+    writeTextFilesWeekly(newItems, siteDir);
     writeExcel(newItems, siteFile(FILES.excel));
+    writeExcelWeekly(newItems, siteDir);
     archiveRun(newItems, archiveSiteDir);
+    archiveRunWeekly(newItems, archiveSiteDir);
   }
 
   return newItems;
@@ -101,7 +104,9 @@ async function run() {
       const tagGlobalFile = name => path.join(tagGlobalDir, name);
 
       writeTextFiles(tagNewItems, tagGlobalFile);
+      writeTextFilesWeekly(tagNewItems, tagGlobalDir);
       writeExcel(tagNewItems, tagGlobalFile(FILES.excel));
+      writeExcelWeekly(tagNewItems, tagGlobalDir);
     }
 
     allNewItems.push(...tagNewItems);
@@ -111,8 +116,11 @@ async function run() {
 
   if (allNewItems.length) {
     writeTextFiles(allNewItems, globalFile);
+    writeTextFilesWeekly(allNewItems, GLOBAL_DIR);
     writeExcel(allNewItems, globalFile(FILES.excel));
+    writeExcelWeekly(allNewItems, GLOBAL_DIR);
     archiveRun(allNewItems, ARCHIVE_GLOBAL_DIR);
+    archiveRunWeekly(allNewItems, ARCHIVE_GLOBAL_DIR);
   }
 }
 
